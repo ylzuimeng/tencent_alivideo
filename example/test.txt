@@ -1,0 +1,22 @@
+ssh 728dcbd10be2ccaf6fd312cee70121a37a3cf54b-inxiig@inxiig.36pjm1ub.ssh.cloudstudio.work{
+  "VideoTracks": [{
+    "VideoTrackClips": [{
+      "MediaURL": "https://ice-document-materials.oss-cn-shanghai.aliyuncs.com/test_media/h5.mp4",
+      "Effects": [{
+        "Type": "AI_ASR",
+        "Font": "AlibabaPuHuiTi",
+        "Alignment": "TopCenter",
+        "Y": 910,
+        "Outline": 10,
+        "OutlineColour": "#ffffff",
+        "FontSize": 60,
+        "FontColor": "#000079",
+        "FontFace": {
+          "Bold": true,
+          "Italic": false,
+          "Underline": false
+        }
+      }]
+    }]
+  }]
+}
