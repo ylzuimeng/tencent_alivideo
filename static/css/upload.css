@@ -1,0 +1,133 @@
+/* 上传容器样式 */
+.upload-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* 上传区域样式 */
+.upload-area {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    margin: 20px 0;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.upload-area.dragover {
+    border-color: #0d6efd;
+    background: #e9ecef;
+    transform: scale(1.02);
+}
+
+/* 表单元素样式 */
+.form-label {
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.form-control, .form-select {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 8px 12px;
+    transition: border-color 0.15s ease-in-out;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* 进度条样式 */
+.progress {
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.progress-bar {
+    background-color: #0d6efd;
+    transition: width 0.3s ease;
+}
+
+/* 文件列表样式 */
+.table {
+    width: 100%;
+    margin-bottom: 1rem;
+    border-collapse: collapse;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 500;
+    padding: 12px;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.table td {
+    padding: 12px;
+    border-bottom: 1px solid #dee2e6;
+    vertical-align: middle;
+}
+
+/* 状态样式 */
+tr.success .status {
+    color: #198754;
+}
+
+tr.error .status {
+    color: #dc3545;
+}
+
+tr.cancelled .status {
+    color: #6c757d;
+}
+
+/* 按钮样式 */
+.btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #bb2d3b;
+    border-color: #b02a37;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+    .upload-container {
+        padding: 10px;
+    }
+    
+    .table th, .table td {
+        padding: 8px;
+    }
+    
+    .btn {
+        padding: 6px 12px;
+    }
+}

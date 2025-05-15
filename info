@@ -1,0 +1,12 @@
+tencent_alivideo/
+├── templates/                # HTML模板文件
+│   ├── base.html            # 基础模板
+│   ├── upload.html          # 上传页面
+│   ├── task_list.html       # 任务列表
+│   └── templates.html       # 模板管理
+├── static/                  # 静态文件
+│   ├── css/
+│   ├── js/
+│   └── img/
+├── app.py                   # Flask应用主文件
+└── requirements.txt         # 项目依赖

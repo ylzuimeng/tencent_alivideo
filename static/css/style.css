@@ -1,0 +1,23 @@
+.sidebar {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.main-content {
+    padding: 20px;
+}
+
+.upload-area {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    margin: 20px 0;
+    background: #f8f9fa;
+}
+
+.upload-area.dragover {
+    border-color: #0d6efd;
+    background: #e9ecef;
+}

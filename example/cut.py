@@ -5,7 +5,7 @@ from typing import List
 from dotenv import load_dotenv
 
 # 加载.env文件中的环境变量
-load_dotenv(dotenv_path='/workspace/Python/example/.env')
+load_dotenv(dotenv_path='./example/.env')
 
 access_key_id = os.getenv('ACCESS_KEY_ID')
 access_key_secret = os.getenv('ACCESS_KEY_SECRET')
