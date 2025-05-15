@@ -5,7 +5,7 @@ from typing import List
 from dotenv import load_dotenv
 
 # 加载.env文件中的环境变量
-load_dotenv(dotenv_path='/workspace/Python/example/.env')
+load_dotenv(dotenv_path='./example/.env')
 
 access_key_id = os.getenv('ACCESS_KEY_ID')
 access_key_secret = os.getenv('ACCESS_KEY_SECRET')
@@ -403,7 +403,7 @@ class Sample:
         
         # projectId, timeline, templateId 有且只有一个非空
         submit_media_producing_job_request.project_id = get_editing_project.project_id
-        submit_media_producing_job_request.timeline = timeline1_2
+        submit_media_producing_job_request.timeline = timeline4
         submit_media_producing_job_request.output_media_config = "{\"mediaURL\":\"http://krillin-3.oss-cn-shanghai.aliyuncs.com/ice/testOutput6.mp4\",  \
                                                                       \"Width\": 1280, \"Height\": 720}"
         submit_media_producing_job_request.editing_produce_config = "{\"CoverConfig\":{\"StartTime\":2.8}}"
