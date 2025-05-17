@@ -18,3 +18,9 @@ class Config:
     MAX_CONTENT_LENGTH = 500 * 1024 * 1024  # 限制上传文件大小为500MB
     UPLOAD_FOLDER = 'uploads'
     ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv'}
+
+    # 数据库配置
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'db/data.db')
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    

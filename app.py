@@ -1,15 +1,24 @@
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
+from models import db, File
 import os
 from datetime import datetime
 from dotenv import load_dotenv
 import alibabacloud_oss_v2 as oss
+from config import Config
 
 # 加载环境变量
 load_dotenv()
 
 # Flask应用初始化
 app = Flask(__name__)
+app.config.from_object(Config)
+
+# 数据库初始化
+db.init_app(app)
+with app.app_context():
+    db.create_all()
+
 
 # OSS配置类
 class OSSConfig:
@@ -69,6 +78,12 @@ class FileHandler:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f'uploads/{timestamp}_{safe_filename}'
 
+@app.route('/files')
+def files():
+    files = File.query.all()
+    print("0000000")
+    print(files)
+    return render_template('files.html', files=files)
 # 路由处理
 @app.route('/')
 def index():
@@ -127,12 +142,21 @@ def upload_file():
                 'status': 'pending',
                 'created_at': datetime.now().isoformat()
             }
+            # 记录到数据库
+            new_file = File(
+                filename=file.filename,
+                oss_url=file_url,
+                size=file.content_length
+            )
+            db.session.add(new_file)
+            db.session.commit()
             
             return jsonify({
                 'message': '文件上传成功',
                 'file_url': file_url,
                 'task_id': str(task['created_at'])
             })
+            
         else:
             raise Exception("文件上传失败")
             
