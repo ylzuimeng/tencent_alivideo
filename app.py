@@ -134,6 +134,7 @@ def upload_file():
         oss_client = OSSClient(oss_config)
         if oss_client.upload_file(file_content, oss_path):
             file_url = oss_config.get_file_url(oss_path)
+            print(f"文件上传成功，URL: {file_url}")
             
             # 创建任务记录
             task = {

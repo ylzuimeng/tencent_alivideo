@@ -16,13 +16,14 @@
             <th>文件名</th>
             <th>大小（KB）</th>
             <th>上传时间</th>
-            <th>操作</th>
+            <th>文件oss地址</th>
         </tr>
         {% for file in files %}
         <tr>
             <td>{{ file.filename }}</td>
             <td>{{ (file.size / 1024)|round(2) }}</td>
             <td>{{ file.upload_time.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ file.oss_url }}</td>
         </tr>
         {% endfor %}
     </table>
