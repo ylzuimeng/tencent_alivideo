@@ -23,7 +23,6 @@
             <td>{{ file.filename }}</td>
             <td>{{ (file.size / 1024)|round(2) }}</td>
             <td>{{ file.upload_time.strftime('%Y-%m-%d %H:%M') }}</td>
-            
         </tr>
         {% endfor %}
     </table>
