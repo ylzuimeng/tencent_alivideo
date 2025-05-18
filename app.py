@@ -273,6 +273,32 @@ def delete_file(file_id):
     
     return redirect(url_for('files'))
 
+@app.route('/api/save_taskstyle', methods=['POST'])
+def save_taskstyle():
+    try:
+        data = request.get_json()
+        print(data.get('background_file'))
+        # 创建新的TaskStyle记录
+        new_taskstyle = TaskStyle(
+            open_oss_url=data.get('header_file'),
+            close_oss_url=data.get('footer_file'),
+            title_picture_oss_url_1=data.get('background_file'),
+            title_picture_oss_url_2=data.get('background2_file'),
+            change_material_oss_url=data.get('transition_file'),
+            description='自定义模板'  # 可以根据需要修改描述
+        )
+        
+        # 保存到数据库
+        db.session.add(new_taskstyle)
+        db.session.commit()
+        
+        return jsonify({
+            'message': '模板保存成功',
+            'id': new_taskstyle.id
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
