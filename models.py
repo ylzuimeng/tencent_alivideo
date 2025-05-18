@@ -25,3 +25,12 @@ class Template(db.Model):
     def __repr__(self):
         return f'<Template {self.filename}>'
 
+class TaskStyle(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    open_oss_url = db.Column(db.String(255))
+    close_oss_url = db.Column(db.String(255))
+    title_picture_oss_url = db.Column(db.String(255))
+    change_material_oss_url = db.Column(db.String(255))
+    description = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

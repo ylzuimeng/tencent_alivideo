@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from werkzeug.utils import secure_filename
-from models import db, File, Template
+from models import db, File, Template, TaskStyle
 import os
 from datetime import datetime
 from dotenv import load_dotenv
@@ -119,6 +119,12 @@ def task_list():
 def templates():
     files = Template.query.all()
     return render_template('templates.html', files=files)
+
+@app.route('/taskstyles')
+def taskstyles():
+    files = Template.query.all()
+    taskstyles = TaskStyle.query.all()
+    return render_template('taskstyles.html', files=files, taskstyles=taskstyles)
 
 # 文件上传处理
 @app.route('/api/upload/video', methods=['POST'])
