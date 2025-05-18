@@ -134,6 +134,7 @@ def upload_file():
         # 准备上传
         oss_path = FileHandler.generate_oss_path(file.filename)
         file_content = file.read()
+        file_size = len(file_content)  # 获取文件内容的实际大小
         
         # 执行上传
         oss_client = OSSClient(oss_config)
@@ -152,7 +153,7 @@ def upload_file():
             new_file = File(
                 filename=file.filename,
                 oss_url=file_url,
-                size=file.content_length
+                size=file_size  # 使用实际的文件大小
             )
             db.session.add(new_file)
             db.session.commit()

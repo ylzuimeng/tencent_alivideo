@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="upload-container">
-    <h2>文件上传</h2>
+    <h2>模版文件上传</h2>
     <div class="upload-area" id="dropZone">
         <form id="uploadForm" enctype="multipart/form-data">
             <div class="mb-3">
@@ -163,36 +163,22 @@ async function uploadFile(fileInfo) {
     formData.append('template', document.getElementById('templateSelect').value);
     
     try {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/upload', true);
-
-        // 添加上传进度监听
-        xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-                const progress = Math.round((event.loaded * 100) / event.total);
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+            onUploadProgress: (progressEvent) => {
+                const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
                 updateFileProgress(fileInfo.id, progress);
             }
-        };
-
-        // 处理请求完成
-        xhr.onload = async () => {
-            if (xhr.status === 200) {
-                const result = JSON.parse(xhr.responseText);
-                updateFileStatus(fileInfo.id, 'success', '上传成功');
-            } else {
-                const error = JSON.parse(xhr.responseText);
-                updateFileStatus(fileInfo.id, 'error', error.error || '上传失败');
-            }
-        };
-
-        // 处理请求错误
-        xhr.onerror = () => {
-            updateFileStatus(fileInfo.id, 'error', '上传失败');
-            console.error('Upload error');
-        };
-
-        // 发送请求
-        xhr.send(formData);
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            updateFileStatus(fileInfo.id, 'success', '上传成功');
+        } else {
+            const error = await response.json();
+            updateFileStatus(fileInfo.id, 'error', error.error || '上传失败');
+        }
     } catch (error) {
         updateFileStatus(fileInfo.id, 'error', '上传失败');
         console.error('Upload error:', error);
