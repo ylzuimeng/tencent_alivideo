@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from werkzeug.utils import secure_filename
 from models import db, File
 import os
@@ -63,6 +63,13 @@ class OSSClient:
             body=file_content
         ))
         return result.status == 'OK' or result.status == 200
+    
+    def delete_file(self, oss_path):
+        result = self.client.delete_object(oss.DeleteObjectRequest(
+            bucket=self.config.bucket_name,
+            key=oss_path
+        ))
+        return result.status == 'OK' or result.status == 200
 
 # 文件处理类
 class FileHandler:
@@ -81,8 +88,6 @@ class FileHandler:
 @app.route('/files')
 def files():
     files = File.query.all()
-    print("0000000")
-    print(files)
     return render_template('files.html', files=files)
 # 路由处理
 @app.route('/')
@@ -163,6 +168,26 @@ def upload_file():
             
     except Exception as e:
         return jsonify({'error': f'上传失败: {str(e)}'}), 500
+
+# 删除视频    
+@app.route('/api/delete/<int:file_id>', methods=['POST'])
+def delete_file(file_id):
+    file = File.query.get_or_404(file_id)
+    # 从 OSS 初始化
+    oss_config = OSSConfig()
+    oss_client = OSSClient(oss_config)
+
+    # 从 OSS 删除文件
+    oss_path = "uploads/" + file.oss_url.split('/')[-1]
+    print(oss_path)
+    oss_client.delete_file(oss_path)    
+    
+    # 删除数据库记录
+    db.session.delete(file)
+    db.session.commit()
+    
+    return redirect(url_for('files'))
+
 
 if __name__ == '__main__':
     app.run(debug=True)

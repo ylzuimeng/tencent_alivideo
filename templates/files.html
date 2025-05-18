@@ -17,6 +17,7 @@
             <th>大小（KB）</th>
             <th>上传时间</th>
             <th>文件oss地址</th>
+            <th>删除</th>
         </tr>
         {% for file in files %}
         <tr>
@@ -24,6 +25,11 @@
             <td>{{ (file.size / 1024)|round(2) }}</td>
             <td>{{ file.upload_time.strftime('%Y-%m-%d %H:%M') }}</td>
             <td>{{ file.oss_url }}</td>
+            <td>
+                <form method="post" action="/api/delete/{{ file.id }}" style="display: inline;">
+                    <button type="submit" onclick="return confirm('确定要删除这个文件吗?')">删除</button>
+                </form>
+            </td>
         </tr>
         {% endfor %}
     </table>
