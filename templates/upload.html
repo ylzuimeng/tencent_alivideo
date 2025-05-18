@@ -169,7 +169,7 @@ async function uploadFile(fileInfo) {
         // 添加上传进度监听
         xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
-                const progress = Math.round((event.loaded * 100) / event.total);
+                const progress = Math.min(Math.round((event.loaded * 100) / event.total), 95);
                 updateFileProgress(fileInfo.id, progress);
             }
         };
@@ -178,6 +178,7 @@ async function uploadFile(fileInfo) {
         xhr.onload = async () => {
             if (xhr.status === 200) {
                 const result = JSON.parse(xhr.responseText);
+                updateFileProgress(fileInfo.id, 100)
                 updateFileStatus(fileInfo.id, 'success', '上传成功');
             } else {
                 const error = JSON.parse(xhr.responseText);
