@@ -25,7 +25,7 @@
                                 <i class="fas fa-file-video text-primary me-2"></i>
                                 {{ file.filename }}
                             </td>
-                            <td>{{ (file.size / (1024*1024))|round(1) }}</td>
+                            <td>{{ (file.size / (1024*1024))|round(2) }}</td>
                             <td>{{ file.upload_time.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td>
                                 <a href="{{ file.oss_url }}" target="_blank" class="text-truncate d-inline-block" style="max-width: 200px;" title="{{ file.oss_url }}">

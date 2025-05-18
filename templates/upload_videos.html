@@ -164,7 +164,7 @@ async function uploadFile(fileInfo) {
     
     try {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/upload', true);
+        xhr.open('POST', '/api/upload/video', true);
 
         // 添加上传进度监听
         xhr.upload.onprogress = (event) => {

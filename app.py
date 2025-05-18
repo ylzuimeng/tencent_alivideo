@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from werkzeug.utils import secure_filename
-from models import db, File
+from models import db, File, Template
 import os
 from datetime import datetime
 from dotenv import load_dotenv
@@ -85,6 +85,19 @@ class FileHandler:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f'uploads/{timestamp}_{safe_filename}'
 
+# 模版处理类
+class TemplateHandler:
+
+    @staticmethod
+    def allowed_file(filename):
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in FileHandler.ALLOWED_EXTENSIONS
+
+    @staticmethod
+    def generate_oss_path(filename):
+        safe_filename = secure_filename(filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        return f'templates/{timestamp}_{safe_filename}'
+
 @app.route('/files')
 def files():
     files = File.query.all()
@@ -92,11 +105,11 @@ def files():
 # 路由处理
 @app.route('/')
 def index():
-    return render_template('upload.html')
+    return render_template('upload_videos.html')
 
-@app.route('/upload')
+@app.route('/upload/video')
 def upload():
-    return render_template('upload.html')
+    return render_template('upload_videos.html')
 
 @app.route('/task_list')
 def task_list():
@@ -104,10 +117,11 @@ def task_list():
 
 @app.route('/templates')
 def templates():
-    return render_template('templates.html')
+    files = Template.query.all()
+    return render_template('templates.html', files=files)
 
 # 文件上传处理
-@app.route('/api/upload', methods=['POST'])
+@app.route('/api/upload/video', methods=['POST'])
 def upload_file():
     try:
         # 初始化配置
@@ -151,6 +165,70 @@ def upload_file():
             }
             # 记录到数据库
             new_file = File(
+                filename=file.filename,
+                oss_url=file_url,
+                size=file_size  # 使用实际的文件大小
+            )
+            db.session.add(new_file)
+            db.session.commit()
+            
+            return jsonify({
+                'message': '文件上传成功',
+                'file_url': file_url,
+                'task_id': str(task['created_at'])
+            })
+            
+        else:
+            raise Exception("文件上传失败")
+            
+    except Exception as e:
+        return jsonify({'error': f'上传失败: {str(e)}'}), 500
+
+# 模板上传处理
+@app.route('/api/upload/template', methods=['POST'])
+def upload_template():
+    try:
+        # 初始化配置
+        oss_config = OSSConfig()
+        
+        # 验证文件存在
+        if 'file' not in request.files:
+            return jsonify({'error': '没有文件上传'}), 400
+        
+        file = request.files['file']
+        template = request.form.get('template', '')
+        
+        # 验证文件有效性
+        if file.filename == '':
+            return jsonify({'error': '没有选择文件'}), 400
+            
+        if not FileHandler.allowed_file(file.filename):
+            return jsonify({'error': '不支持的文件格式'}), 400
+
+        # 验证OSS配置
+        if not oss_config.is_valid():
+            return jsonify({'error': 'OSS配置不完整，请检查环境变量'}), 500
+        
+        # 准备上传
+        oss_path = TemplateHandler.generate_oss_path(file.filename)
+        file_content = file.read()
+        file_size = len(file_content)  # 获取文件内容的实际大小
+        
+        # 执行上传
+        oss_client = OSSClient(oss_config)
+        if oss_client.upload_file(file_content, oss_path):
+            file_url = oss_config.get_file_url(oss_path)
+            print(f"文件上传成功，URL: {file_url}")
+            
+            # 创建任务记录
+            task = {
+                'file_url': file_url,
+                'template': template,
+                'status': 'pending',
+                'created_at': datetime.now().isoformat()
+            }
+            # 记录到数据库
+            new_file = Template(
                 filename=file.filename,
                 oss_url=file_url,
                 size=file_size  # 使用实际的文件大小
