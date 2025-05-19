@@ -253,7 +253,24 @@ def upload_template():
             
     except Exception as e:
         return jsonify({'error': f'上传失败: {str(e)}'}), 500
+# 删除模版文件    
+@app.route('/api/upload/templates/delete/<int:file_id>', methods=['POST'])
+def template_delete_file(file_id):
+    file = Template.query.get_or_404(file_id)
+    # 从 OSS 初始化
+    oss_config = OSSConfig()
+    oss_client = OSSClient(oss_config)
 
+    # 从 OSS 删除文件
+    oss_path = "templates/" + file.oss_url.split('/')[-1]
+    print(oss_path)
+    oss_client.delete_file(oss_path)    
+    
+    # 删除数据库记录
+    db.session.delete(file)
+    db.session.commit()
+    
+    return redirect(url_for('templates'))
 # 删除视频    
 @app.route('/api/delete/<int:file_id>', methods=['POST'])
 def delete_file(file_id):
