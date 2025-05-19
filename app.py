@@ -317,5 +317,16 @@ def save_taskstyle():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# 删除task    
+@app.route('/api/delete_taskstyle/<int:taskstyle_id>', methods=['POST'])
+def taskstyle_delete_file(taskstyle_id):
+    taskstyle = TaskStyle.query.get_or_404(taskstyle_id)
+   
+    # 删除数据库记录
+    db.session.delete(taskstyle)
+    db.session.commit()
+    
+    return redirect(url_for('taskstyles'))
+
 if __name__ == '__main__':
     app.run(debug=True)
