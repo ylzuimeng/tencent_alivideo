@@ -76,7 +76,7 @@
                                 </a>
                             </td>
                             <td class="text-center">
-                                <form method="post" action="/api/upload/templates/delete/{{ file.id }}" class="d-inline">
+                                <form method="post" action="/api/upload/templates/delete//{{ file.id }}" class="d-inline">
                                     <button type="submit" class="btn btn-danger btn-sm" 
                                             onclick="return confirm('确定要删除这个文件吗?')"
                                             title="删除文件">
@@ -228,8 +228,22 @@
             xhr.onload = async () => {
                 if (xhr.status === 200) {
                     const result = JSON.parse(xhr.responseText);
-                    updateFileProgress(fileInfo.id, 100)
+                    updateFileProgress(fileInfo.id, 100);
                     updateFileStatus(fileInfo.id, 'success', '上传成功');
+                    
+                    // 刷新文件列表
+                    fetch(window.location.href)
+                        .then(response => response.text())
+                        .then(html => {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(html, 'text/html');
+                            const newFileList = doc.querySelector('.table-responsive');
+                            const currentFileList = document.querySelector('.table-responsive');
+                            if (newFileList && currentFileList) {
+                                currentFileList.innerHTML = newFileList.innerHTML;
+                            }
+                        })
+                        .catch(error => console.error('刷新文件列表失败:', error));
                 } else {
                     const error = JSON.parse(xhr.responseText);
                     updateFileStatus(fileInfo.id, 'error', error.error || '上传失败');
