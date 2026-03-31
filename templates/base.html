@@ -3,28 +3,38 @@
 <head>
     <title>视频处理平台</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">
             <!-- 侧边栏 -->
             <div class="col-md-2 sidebar">
+                <div class="sidebar-header mb-3">
+                    <h6 class="text-uppercase text-muted small fw-bold">功能菜单</h6>
+                </div>
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('upload') }}">文件上传</a>
+                        <a class="nav-link" href="{{ url_for('upload') }}">
+                            <i class="fas fa-cloud-upload-alt me-2"></i>上传素材
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('task_list') }}">任务列表</a>
+                        <a class="nav-link" href="{{ url_for('taskstyles') }}">
+                            <i class="fas fa-palette me-2"></i>模板管理
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('templates') }}">模板文件上传</a>
+                        <a class="nav-link" href="{{ url_for('files') }}">
+                            <i class="fas fa-folder me-2"></i>文件管理
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('files') }}">已上传文件</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('taskstyles') }}">模版管理</a>
+                        <a class="nav-link" href="{{ url_for('task_list') }}">
+                            <i class="fas fa-tasks me-2"></i>任务列表
+                        </a>
                     </li>
                 </ul>
             </div>

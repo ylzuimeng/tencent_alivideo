@@ -18,7 +18,17 @@
                     <option value="template2">模板2 - 双语字幕</option>
                     <option value="template3">模板3 - 特效字幕</option>
                     <option value="template4">模板4 - 自定义样式</option>
+                    <option value="custom">自定义模板文件</option>
                 </select>
+            </div>
+
+            <!-- 自定义模板选择（当选择自定义模板时显示） -->
+            <div class="mb-3 d-none" id="customTemplateGroup">
+                <label for="customTemplateSelect" class="form-label">选择自定义模板</label>
+                <select class="form-select" id="customTemplateSelect">
+                    <option value="">请从数据库选择模板...</option>
+                </select>
+                <small class="form-text text-muted">从已上传的模板文件中选择</small>
             </div>
             <div class="progress mb-3 d-none">
                 <div class="progress-bar" role="progressbar" style="width: 0%"></div>
@@ -35,7 +45,7 @@
                     <th>大小</th>
                     <th>状态</th>
                     <th>进度</th>
-                    <th>操作</th>
+                    <th class="action-cell">操作</th>
                 </tr>
             </thead>
             <tbody id="fileListBody">
@@ -69,10 +79,46 @@ const fileListBody = document.getElementById('fileListBody');
 const uploadForm = document.getElementById('uploadForm');
 const progressBar = document.querySelector('.progress-bar');
 const progress = document.querySelector('.progress');
+const templateSelect = document.getElementById('templateSelect');
+const customTemplateGroup = document.getElementById('customTemplateGroup');
+const customTemplateSelect = document.getElementById('customTemplateSelect');
 
 let uploadQueue = [];
 let currentUploads = 0;
 const MAX_CONCURRENT_UPLOADS = 3;
+
+// 页面加载时获取模板列表
+async function loadTemplates() {
+    try {
+        const response = await fetch('/api/templates');
+        const templates = await response.json();
+
+        // 清空现有选项（保留默认选项）
+        customTemplateSelect.innerHTML = '<option value="">请从数据库选择模板...</option>';
+
+        // 添加模板选项
+        templates.forEach(template => {
+            const option = document.createElement('option');
+            option.value = template.oss_url;
+            option.textContent = template.filename;
+            customTemplateSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('加载模板列表失败:', error);
+    }
+}
+
+// 模板选择变化处理
+templateSelect.addEventListener('change', function() {
+    if (this.value === 'custom') {
+        customTemplateGroup.classList.remove('d-none');
+    } else {
+        customTemplateGroup.classList.add('d-none');
+    }
+});
+
+// 页面加载时获取模板列表
+loadTemplates();
 
 // 拖拽上传相关事件处理
 dropZone.addEventListener('dragover', (e) => {
@@ -136,7 +182,7 @@ function addFileToTable(fileInfo) {
                 <div class="progress-bar" role="progressbar" style="width: 0%"></div>
             </div>
         </td>
-        <td>
+        <td class="action-cell">
             <button class="btn btn-sm btn-danger" onclick="cancelUpload('${fileInfo.id}')">取消</button>
         </td>
     `;
@@ -160,8 +206,14 @@ async function processQueue() {
 async function uploadFile(fileInfo) {
     const formData = new FormData();
     formData.append('file', fileInfo.file);
-    formData.append('template', document.getElementById('templateSelect').value);
-    
+
+    // 处理模板选择
+    let selectedTemplate = templateSelect.value;
+    if (selectedTemplate === 'custom') {
+        selectedTemplate = customTemplateSelect.value || '';
+    }
+    formData.append('template', selectedTemplate);
+
     try {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/api/upload/video', true);
@@ -180,6 +232,8 @@ async function uploadFile(fileInfo) {
                 const result = JSON.parse(xhr.responseText);
                 updateFileProgress(fileInfo.id, 100)
                 updateFileStatus(fileInfo.id, 'success', '上传成功');
+                // 🆕 上传成功后显示处理选项，保存file_id
+                onUploadSuccess(fileInfo.id, result.file_url, result.file_id);
             } else {
                 const error = JSON.parse(xhr.responseText);
                 updateFileStatus(fileInfo.id, 'error', error.error || '上传失败');
@@ -237,5 +291,225 @@ function formatFileSize(bytes) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+// 🆕 上传成功后显示处理选项
+function onUploadSuccess(fileId, fileUrl, dbFileId) {
+    const row = document.getElementById(`file-${fileId}`);
+    if (!row) return;
+
+    // 保存file_id到row的data属性中，供后续使用
+    row.setAttribute('data-db-file-id', dbFileId);
+
+    // 添加"处理视频"按钮
+    const actionCell = row.querySelector('.action-cell');
+    if (actionCell) {
+        actionCell.innerHTML = `
+            <button class="btn btn-success btn-sm" onclick="showProcessModal('${fileUrl}', '${fileId}', ${dbFileId})">
+                <i class="fas fa-magic"></i> 处理视频
+            </button>
+        `;
+    }
+}
+
+// 🆕 显示处理对话框
+async function showProcessModal(fileUrl, fileId, dbFileId) {
+    try {
+        // 获取TaskStyle列表
+        const response = await fetch('/api/taskstyles');
+        const data = await response.json();
+
+        const taskStyles = data.taskstyles || [];
+        let optionsHtml = '<option value="">不使用模板（仅上传视频）</option>';
+
+        // 生成下拉选项
+        taskStyles.forEach(ts => {
+            // 统计模板包含的组件
+            const components = [];
+            if (ts.open_oss_url) components.push('片头');
+            if (ts.close_oss_url) components.push('片尾');
+            if (ts.change_material_oss_url) components.push('过渡');
+            if (ts.title_picture_oss_url_1) components.push('背景1');
+            if (ts.title_picture_oss_url_2) components.push('背景2');
+
+            const componentText = components.length > 0 ? `（${components.join('、')}）` : '';
+
+            optionsHtml += `<option value="${ts.id}">${ts.name}${componentText}</option>`;
+        });
+
+        // 如果没有模板，显示友好提示
+        if (taskStyles.length === 0) {
+            optionsHtml = '<option value="">暂无可用模板</option>';
+        }
+
+        // 创建模态框
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'processModal';
+        modal.innerHTML = `
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-magic me-2"></i>处理视频
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        ${taskStyles.length === 0 ? `
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>还没有可用模板</strong>
+                                <br>
+                                请先前往
+                                <a href="/taskstyles" target="_blank" class="alert-link">
+                                    <i class="fas fa-external-link-alt me-1"></i>模板管理
+                                </a>
+                                页面创建模板
+                            </div>
+                        ` : `
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                选择一个模板自动应用片头、片尾等效果，或选择"不使用模板"仅上传视频
+                            </div>
+                        `}
+                        <div class="mb-3">
+                            <label for="processTaskStyleSelect" class="form-label fw-bold">
+                                <i class="fas fa-palette me-2"></i>选择处理模板
+                            </label>
+                            <select id="processTaskStyleSelect" class="form-select" ${taskStyles.length === 0 ? 'disabled' : ''}>
+                                ${optionsHtml}
+                            </select>
+                            <div id="templatePreview" class="mt-2" style="display: none;">
+                                <small class="text-muted fw-bold">模板包含：</small>
+                                <ul class="template-components mb-0 ps-4 mt-1"></ul>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="processTaskName" class="form-label fw-bold">
+                                <i class="fas fa-tag me-2"></i>任务名称
+                            </label>
+                            <input type="text" id="processTaskName" class="form-control"
+                                   placeholder="例如：我的视频处理" value="">
+                            <small class="form-text text-muted">为这个处理任务起个名字</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">源文件</label>
+                            <input type="text" class="form-control" value="${fileUrl.substring(0, 50)}..." readonly>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>取消
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="createProcessingTask('${fileUrl}', ${dbFileId})">
+                            <i class="fas fa-play me-1"></i>开始处理
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 显示模态框
+        const bootstrapModal = new bootstrap.Modal(modal);
+        bootstrapModal.show();
+
+        // 添加模板选择变化监听器
+        const taskStyleSelect = document.getElementById('processTaskStyleSelect');
+        if (taskStyleSelect) {
+            taskStyleSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                showTemplatePreview(selectedOption);
+            });
+        }
+
+        // 模态框关闭时移除DOM
+        modal.addEventListener('hidden.bs.modal', () => {
+            document.body.removeChild(modal);
+        });
+
+    } catch (error) {
+        console.error('显示处理对话框失败:', error);
+        alert('打开处理对话框失败，请稍后重试');
+    }
+}
+
+// 🆕 显示模板预览
+function showTemplatePreview(option) {
+    const preview = document.getElementById('templatePreview');
+    const components = preview.querySelector('.template-components');
+
+    // 获取option的data-info属性（如果设置了）
+    const infoJson = option.getAttribute('data-info');
+    const info = infoJson ? JSON.parse(infoJson) : {};
+
+    let html = '';
+    if (info.header) html += '<li><i class="fas fa-film text-success me-2"></i>片头视频</li>';
+    if (info.footer) html += '<li><i class="fas fa-film text-success me-2"></i>片尾视频</li>';
+    if (info.transition) html += '<li><i class="fas fa-random text-warning me-2"></i>过渡效果</li>';
+    if (info.bg1) html += '<li><i class="fas fa-image text-info me-2"></i>背景图片1</li>';
+    if (info.bg2) html += '<li><i class="fas fa-image text-info me-2"></i>背景图片2</li>';
+
+    if (html) {
+        components.innerHTML = html;
+        preview.style.display = 'block';
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
+// 🆕 创建处理任务
+async function createProcessingTask(fileUrl, sourceFileId) {
+    const taskStyleSelect = document.getElementById('processTaskStyleSelect');
+    const taskStyleId = taskStyleSelect ? taskStyleSelect.value : '';
+    const taskName = document.getElementById('processTaskName').value || '视频处理任务';
+
+    // 验证
+    if (!sourceFileId) {
+        alert('文件ID缺失，请重新上传文件');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/tasks/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                source_file_id: sourceFileId,
+                task_style_id: taskStyleId || null,
+                task_name: taskName
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+
+            // 关闭模态框
+            const modal = document.getElementById('processModal');
+            const bootstrapModal = bootstrap.Modal.getInstance(modal);
+            bootstrapModal.hide();
+
+            alert(`任务创建成功！任务ID: ${result.task_id}\n即将跳转到任务列表页面...`);
+
+            // 跳转到任务列表页面
+            setTimeout(() => {
+                window.location.href = '/task_list';
+            }, 1000);
+        } else {
+            const error = await response.json();
+            alert('创建任务失败：' + (error.error || '未知错误'));
+        }
+
+    } catch (error) {
+        console.error('创建任务失败:', error);
+        alert('创建任务失败，请稍后重试');
+    }
+}
 </script>
+
+<!-- 添加Font Awesome图标支持 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 {% endblock %}

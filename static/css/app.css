@@ -1,0 +1,306 @@
+/* ============================================
+   应用全局样式 - 统一设计规范
+   ============================================ */
+
+/* ========== 按钮规范 ========== */
+.btn {
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
+}
+
+.btn-success {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+.btn-success:hover {
+    background-color: #157347;
+    border-color: #146c43;
+    box-shadow: 0 4px 8px rgba(25, 135, 84, 0.3);
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.btn-danger:hover {
+    background-color: #bb2d3b;
+    border-color: #b02a37;
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.btn-secondary:hover {
+    background-color: #5c636a;
+    border-color: #565e64;
+}
+
+.btn-outline-primary {
+    color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary.active {
+    background-color: #0d6efd;
+    color: #fff;
+}
+
+/* ========== 表格规范 ========== */
+.table {
+    --bs-table-bg: transparent;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.table th {
+    background-color: #f1f3f5;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.875rem;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+    padding: 0.75rem;
+}
+
+.table td {
+    vertical-align: middle;
+    padding: 0.75rem;
+}
+
+/* ========== 卡片规范 ========== */
+.card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    background-color: #fff;
+}
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: #fff;
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
+    font-weight: 600;
+}
+
+/* ========== 表单规范 ========== */
+.form-control:focus,
+.form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.form-control::placeholder,
+.form-select::placeholder {
+    color: #6c757d;
+}
+
+/* ========== 状态徽章 ========== */
+.badge {
+    padding: 0.35em 0.65em;
+    font-weight: 500;
+    border-radius: 4px;
+}
+
+.badge-pending {
+    background-color: #6c757d;
+    color: #fff;
+}
+
+.badge-processing {
+    background-color: #0d6efd;
+    color: #fff;
+}
+
+.badge-completed {
+    background-color: #198754;
+    color: #fff;
+}
+
+.badge-failed {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+/* ========== 进度条规范 ========== */
+.progress {
+    height: 25px;
+    background-color: #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+    line-height: 25px;
+    transition: width 0.3s ease;
+}
+
+/* ========== 模态框优化 ========== */
+.modal-content {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    border-bottom: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+.modal-footer {
+    border-top: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+/* ========== 输入组优化 ========== */
+.input-group-text {
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    font-weight: 500;
+}
+
+/* ========== 分页组件 ========== */
+.pagination .page-link {
+    border-radius: 4px;
+    margin: 0 2px;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+/* ========== 工具提示 ========== */
+[data-bs-toggle="tooltip"] {
+    cursor: help;
+}
+
+/* ========== 自定义辅助类 ========== */
+.text-truncate-custom {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.shadow-sm {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+}
+
+.shadow {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.shadow-lg {
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175) !important;
+}
+
+/* ========== 动画效果 ========== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+/* ========== 响应式优化 ========== */
+@media (max-width: 768px) {
+    .btn {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+    }
+
+    .card {
+        margin-bottom: 1rem;
+    }
+
+    .table-responsive {
+        border-radius: 8px;
+    }
+}
+
+/* ========== 任务卡片特殊样式 ========== */
+.task-card {
+    border-left: 4px solid #dee2e6;
+}
+
+.task-card[data-status="pending"] {
+    border-left-color: #6c757d;
+}
+
+.task-card[data-status="processing"] {
+    border-left-color: #0d6efd;
+}
+
+.task-card[data-status="completed"] {
+    border-left-color: #198754;
+}
+
+.task-card[data-status="failed"] {
+    border-left-color: #dc3545;
+}
+
+/* ========== 模板预览列表 ========== */
+.template-components {
+    list-style: none;
+    padding-left: 0;
+}
+
+.template-components li {
+    padding: 0.25rem 0;
+    font-size: 0.875rem;
+}
