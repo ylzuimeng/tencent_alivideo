@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Optional, Dict, List
 
 from flask import current_app
+from sqlalchemy.orm import joinedload
 from models import db, ProcessingTask, File, TaskStyle, DoctorInfo, VideoTemplate
 from services.ice_service import ICEClient
 
@@ -338,7 +339,11 @@ class TaskProcessor:
 
     def get_all_tasks(self, limit: int = 50) -> list:
         """
-        获取所有任务
+        获取所有任务（优化版本，避免N+1查询）
+
+        使用joinedload预加载所有关联数据，一次性完成查询。
+        优化前：51次数据库查询（1次查询任务列表 + 50次查询每个任务详情）
+        优化后：1次数据库查询（使用joinedload预加载关联数据）
 
         Args:
             limit: 最多返回数量
@@ -346,11 +351,32 @@ class TaskProcessor:
         Returns:
             任务列表
         """
-        tasks = ProcessingTask.query.order_by(
+        # 使用joinedload预加载所有关联数据，避免N+1查询
+        tasks = ProcessingTask.query.options(
+            joinedload(ProcessingTask.source_file),
+            joinedload(ProcessingTask.task_style),
+            joinedload(ProcessingTask.video_template),
+            joinedload(ProcessingTask.doctor_info)
+        ).order_by(
             ProcessingTask.created_at.desc()
         ).limit(limit).all()
 
-        return [self.get_task_status(task.id) for task in tasks]
+        # 直接构建响应，无需额外查询
+        return [{
+            'id': task.id,
+            'task_name': task.task_name,
+            'status': task.status,
+            'progress': task.progress,
+            'output_oss_url': task.output_oss_url,
+            'error_message': task.error_message,
+            'created_at': task.created_at.isoformat(),
+            'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+            # 关联数据已预加载，可直接访问
+            'source_file_name': task.source_file.filename if task.source_file else None,
+            'template_name': task.video_template.name if task.video_template else
+                          (task.task_style.name if task.task_style else None),
+            'doctor_name': task.doctor_info.name if task.doctor_info else None
+        } for task in tasks]
 
 
 # 全局任务处理器实例

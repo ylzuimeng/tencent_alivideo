@@ -8,9 +8,36 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>任务列表</h2>
-        <button onclick="loadTasks()" class="btn btn-outline-primary">
-            <i class="fas fa-sync-alt"></i> 刷新
-        </button>
+        <div>
+            <button onclick="showBatchActions()" class="btn btn-outline-primary me-2">
+                <i class="fas fa-check-square me-1"></i>批量操作
+            </button>
+            <button onclick="loadTasks()" class="btn btn-outline-primary">
+                <i class="fas fa-sync-alt"></i> 刷新
+            </button>
+        </div>
+    </div>
+
+    <!-- 批量操作面板 -->
+    <div id="batchActionsPanel" class="card mb-4" style="display: none;">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>已选择 <span id="selectedCount">0</span> 个任务</strong>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-outline-danger" onclick="batchDelete()">
+                        <i class="fas fa-trash me-1"></i>批量删除
+                    </button>
+                    <button class="btn btn-outline-warning" onclick="batchRetry()">
+                        <i class="fas fa-redo me-1"></i>批量重试
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="clearSelection()">
+                        <i class="fas fa-times me-1"></i>取消选择
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 任务筛选按钮组 -->
@@ -56,11 +83,41 @@
         <p class="mt-3 text-muted">正在加载任务列表...</p>
     </div>
 </div>
+
+<!-- 视频预览模态框 -->
+<div class="modal fade" id="videoPreviewModal" tabindex="-1" aria-labelledby="videoPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="videoPreviewModalLabel">
+                    <i class="fas fa-play-circle me-2"></i>
+                    <span id="videoTitle">视频预览</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="ratio ratio-16x9">
+                    <video id="previewVideoPlayer" controls preload="metadata">
+                        <source id="videoSource" src="" type="video/mp4">
+                        您的浏览器不支持视频播放。
+                    </video>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <a id="downloadFromPreview" href="#" class="btn btn-success" download>
+                    <i class="fas fa-download me-1"></i> 下载视频
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<script src="{{ url_for('static', filename='js/ui-utils.js') }}"></script>
 
 <script>
 let refreshInterval;
@@ -154,9 +211,12 @@ function createTaskCard(task) {
     const progressBar = getProgressBar(task.status, task.progress);
 
     col.innerHTML = `
-        <div class="card task-card">
+        <div class="card task-card" data-task-id="${task.id}">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span class="task-name">${escapeHtml(task.task_name)}</span>
+                <div class="d-flex align-items-center">
+                    <input type="checkbox" class="form-check-input me-2 task-checkbox" value="${task.id}" onchange="updateSelection()">
+                    <span class="task-name">${escapeHtml(task.task_name)}</span>
+                </div>
                 ${statusBadge}
             </div>
             <div class="card-body">
@@ -174,8 +234,11 @@ function createTaskCard(task) {
                         <a href="${task.output_oss_url}" target="_blank" class="btn btn-success flex-grow-1">
                             <i class="fas fa-download"></i> 下载成品
                         </a>
+                        <button class="btn btn-primary" onclick="previewVideo('${task.output_oss_url}', '${escapeHtml(task.task_name)}')">
+                            <i class="fas fa-play"></i> 预览
+                        </button>
                     ` : task.status === 'failed' ? `
-                        <button class="btn btn-warning flex-grow-1" onclick="alert('重试功能开发中')">
+                        <button class="btn btn-warning flex-grow-1" onclick="retryTask(${task.id})">
                             <i class="fas fa-redo"></i> 重试
                         </button>
                     ` : `
@@ -259,11 +322,205 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// 格式化日期
+// 格式化日期（处理UTC时间转北京时间）
 function formatDate(dateString) {
     if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleString('zh-CN');
+
+    // 确保时间字符串有Z后缀（UTC时间标识）
+    const isoString = dateString.endsWith('Z') ? dateString : dateString + 'Z';
+    const date = new Date(isoString);
+
+    // 格式化为北京时间
+    return date.toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+}
+
+// ==================== 批量操作功能 ====================
+
+// 显示批量操作面板
+function showBatchActions() {
+    document.getElementById('batchActionsPanel').style.display = 'block';
+    Toast.info('请勾选要操作的任务');
+}
+
+// 更新选择状态
+function updateSelection() {
+    const checkboxes = document.querySelectorAll('.task-checkbox:checked');
+    const count = checkboxes.length;
+    document.getElementById('selectedCount').textContent = count;
+
+    // 显示或隐藏批量操作面板
+    const panel = document.getElementById('batchActionsPanel');
+    if (count > 0) {
+        panel.style.display = 'block';
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+// 清除选择
+function clearSelection() {
+    document.querySelectorAll('.task-checkbox').forEach(cb => cb.checked = false);
+    updateSelection();
+}
+
+// 批量删除
+async function batchDelete() {
+    const checkboxes = document.querySelectorAll('.task-checkbox:checked');
+    const taskIds = Array.from(checkboxes).map(cb => cb.value);
+
+    if (taskIds.length === 0) {
+        Toast.warning('请先选择要删除的任务');
+        return;
+    }
+
+    ConfirmDialog.show(
+        `确定要删除选中的 ${taskIds.length} 个任务吗？`,
+        '批量删除确认',
+        async () => {
+            const successCount = await deleteMultipleTasks(taskIds);
+            Toast.success(`成功删除 ${successCount}/${taskIds.length} 个任务`);
+            clearSelection();
+            loadTasks();
+        }
+    );
+}
+
+// 批量重试
+async function batchRetry() {
+    const checkboxes = document.querySelectorAll('.task-checkbox:checked');
+    const taskIds = Array.from(checkboxes).map(cb => cb.value);
+
+    if (taskIds.length === 0) {
+        Toast.warning('请先选择要重试的任务');
+        return;
+    }
+
+    // 检查是否只选择了失败的任务
+    const failedTasks = allTasks.filter(t =>
+        taskIds.includes(String(t.id)) && t.status === 'failed'
+    );
+
+    if (failedTasks.length !== taskIds.length) {
+        Toast.warning('只能重试失败的任务');
+        return;
+    }
+
+    ConfirmDialog.show(
+        `确定要重试选中的 ${taskIds.length} 个失败任务吗？`,
+        '批量重试确认',
+        async () => {
+            const progressContainer = ProgressBar.show(document.body, '正在批量重试...');
+            let successCount = 0;
+
+            for (const taskId of taskIds) {
+                try {
+                    const response = await fetch(`/api/tasks/${taskId}/retry`, {method: 'POST'});
+                    if (response.ok) {
+                        successCount++;
+                        ProgressBar.update(progressContainer, (successCount / taskIds.length) * 100);
+                    }
+                } catch (error) {
+                    console.error(`重试任务 ${taskId} 失败:`, error);
+                }
+            }
+
+            ProgressBar.hide(progressContainer);
+            Toast.success(`成功提交 ${successCount}/${taskIds.length} 个重试任务`);
+            clearSelection();
+            loadTasks();
+        }
+    );
+}
+
+// 删除多个任务
+async function deleteMultipleTasks(taskIds) {
+    let successCount = 0;
+
+    for (const taskId of taskIds) {
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                successCount++;
+            }
+        } catch (error) {
+            console.error(`删除任务 ${taskId} 失败:`, error);
+        }
+    }
+
+    return successCount;
+}
+
+// 重试单个任务
+async function retryTask(taskId) {
+    ConfirmDialog.show('确定要重试这个任务吗？', '重试确认', async () => {
+        try {
+            const loading = Loading.show('正在提交重试请求...');
+            const response = await fetch(`/api/tasks/${taskId}/retry`, {
+                method: 'POST'
+            });
+            Loading.hide(loading);
+
+            if (response.ok) {
+                Toast.success('重试请求已提交');
+                loadTasks();
+            } else {
+                const error = await response.json();
+                Toast.error(error.error || '重试失败');
+            }
+        } catch (error) {
+            Toast.error('重试失败：' + error.message);
+        }
+    });
+}
+
+// ==================== 视频预览功能 ====================
+
+// 预览视频
+function previewVideo(videoUrl, taskName) {
+    const modal = new bootstrap.Modal(document.getElementById('videoPreviewModal'));
+    const videoPlayer = document.getElementById('previewVideoPlayer');
+    const videoSource = document.getElementById('videoSource');
+    const videoTitle = document.getElementById('videoTitle');
+    const downloadBtn = document.getElementById('downloadFromPreview');
+
+    // 设置视频标题
+    videoTitle.textContent = taskName || '视频预览';
+
+    // 设置视频源
+    videoSource.src = videoUrl;
+    downloadBtn.href = videoUrl;
+
+    // 加载视频源（重要：动态更改源时需要调用）
+    videoPlayer.load();
+
+    // 显示模态框
+    modal.show();
+
+    // 模态框显示后播放视频
+    const modalElement = document.getElementById('videoPreviewModal');
+    modalElement.addEventListener('shown.bs.modal', function () {
+        videoPlayer.play().catch(error => {
+            console.log('自动播放失败，用户可能需要手动点击播放:', error);
+        });
+    }, { once: true });
+
+    // 模态框关闭时停止播放
+    modalElement.addEventListener('hidden.bs.modal', function () {
+        videoPlayer.pause();
+        videoPlayer.currentTime = 0;
+        videoSource.src = '';
+    }, { once: true });
 }
 </script>
 

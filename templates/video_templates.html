@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+.preview-container {
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.preview-frame {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.preview-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.text-overlay {
+    position: absolute;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.subtitle-preview {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 18px;
+}
+
+.subtitle-preview.top { top: 10%; left: 50%; transform: translateX(-50%); }
+.subtitle-preview.center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.subtitle-preview.bottom { bottom: 10%; left: 50%; transform: translateX(-50%); }
+
+.config-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.config-section h6 {
+    color: #495057;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.video-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <!-- 左侧配置面板 -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-cog me-2"></i>视频模板配置</h5>
+                    <button class="btn btn-light btn-sm" onclick="showTemplates()">
+                        <i class="fas fa-list me-1"></i>已保存模板
+                    </button>
+                </div>
+                <div class="card-body">
+                    <form id="templateForm">
+                        <!-- 基本信息 -->
+                        <div class="config-section">
+                            <h6><i class="fas fa-info-circle me-2"></i>基本信息</h6>
+                            <div class="mb-3">
+                                <label class="form-label">模板名称 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="templateName" required
+                                       placeholder="例如：标准医疗视频模板">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">描述</label>
+                                <textarea class="form-control" id="templateDescription" rows="2"
+                                          placeholder="模板描述信息..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- 视频素材 -->
+                        <div class="config-section">
+                            <h6><i class="fas fa-film me-2"></i>视频素材</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">片头视频</label>
+                                    <select class="form-select" id="headerVideo">
+                                        <option value="">无片头</option>
+                                        {% for file in files %}
+                                        <option value="{{ file.oss_url }}" data-name="{{ file.filename }}">
+                                            {{ file.filename }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">片尾视频</label>
+                                    <select class="form-select" id="footerVideo">
+                                        <option value="">无片尾</option>
+                                        {% for file in files %}
+                                        <option value="{{ file.oss_url }}" data-name="{{ file.filename }}">
+                                            {{ file.filename }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 字幕配置 -->
+                        <div class="config-section">
+                            <h6><i class="fas fa-closed-captioning me-2"></i>字幕配置</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">启用字幕</label>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="enableSubtitle">
+                                        <label class="form-check-label" for="enableSubtitle">
+                                            自动生成字幕
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">字幕位置</label>
+                                    <select class="form-select" id="subtitlePosition">
+                                        <option value="bottom">底部</option>
+                                        <option value="center">居中</option>
+                                        <option value="top">顶部</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="extractAudio" checked>
+                                <label class="form-check-label" for="extractAudio">
+                                    提取语音生成字幕
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 文字叠加配置 -->
+                        <div class="config-section">
+                            <h6><i class="fas fa-font me-2"></i>文字叠加配置</h6>
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">字体大小</label>
+                                    <input type="number" class="form-control" id="fontSize" value="30" min="12" max="72">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">字体颜色</label>
+                                    <input type="color" class="form-control form-control-color" id="fontColor" value="#ffffff">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">位置X (%)</label>
+                                    <input type="number" class="form-control" id="positionX" value="10" min="0" max="100">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label class="form-label">位置Y (%)</label>
+                                    <input type="number" class="form-control" id="positionY" value="10" min="0" max="100">
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check mt-4">
+                                        <input class="form-check-input" type="checkbox" id="boldText" checked>
+                                        <label class="form-check-label" for="boldText">
+                                            加粗
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 示例医生信息 -->
+                        <div class="config-section">
+                            <h6><i class="fas fa-user-md me-2"></i>示例医生信息（预览用）</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control" id="previewName" value="张三" placeholder="姓名">
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control" id="previewHospital" value="XX医院" placeholder="医院">
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control" id="previewDept" value="心内科" placeholder="科室">
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control" id="previewTitle" value="主任医师" placeholder="职称">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 操作按钮 -->
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-primary btn-lg" onclick="saveTemplate()">
+                                <i class="fas fa-save me-2"></i>保存模板
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+                                <i class="fas fa-redo me-2"></i>重置
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧预览面板 -->
+        <div class="col-lg-6">
+            <div class="card sticky-top" style="top: 20px; z-index: 1;">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-eye me-2"></i>实时预览</h5>
+                </div>
+                <div class="card-body">
+                    <div class="preview-container">
+                        <div class="preview-frame" id="previewFrame">
+                            <!-- 背景视频预览 -->
+                            <div class="preview-content" id="previewContent">
+                                <!-- 医生信息文字叠加 -->
+                                <div class="text-overlay" id="doctorNameOverlay" style="display: none;"></div>
+                                <div class="text-overlay" id="doctorInfoOverlay" style="display: none;"></div>
+
+                                <!-- 字幕预览 -->
+                                <div class="subtitle-preview bottom" id="subtitlePreview" style="display: none;">
+                                    示例字幕内容
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 预览控制 -->
+                    <div class="mt-3">
+                        <div class="btn-group w-100" role="group">
+                            <button type="button" class="btn btn-outline-primary" onclick="previewPhase('header')">
+                                <i class="fas fa-play me-1"></i>片头
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" onclick="previewPhase('main')">
+                                <i class="fas fa-film me-1"></i>主体
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" onclick="previewPhase('footer')">
+                                <i class="fas fa-stop me-1"></i>片尾
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Timeline JSON 预览 -->
+                    <div class="mt-3">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleTimeline()">
+                            <i class="fas fa-code me-1"></i>查看Timeline JSON
+                        </button>
+                        <pre id="timelineJson" style="display: none; max-height: 300px; overflow-y: auto; font-size: 12px; background: #f8f9fa; padding: 10px; border-radius: 4px;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 模板列表模态框 -->
+<div class="modal fade" id="templatesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">已保存的模板</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>模板名称</th>
+                                <th>片头</th>
+                                <th>片尾</th>
+                                <th>字幕</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="templatesTableBody">
+                            <!-- 模板列表将通过JavaScript动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let currentPhase = 'header';
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', function() {
+    initializeEventListeners();
+    updatePreview();
+});
+
+// 初始化事件监听器
+function initializeEventListeners() {
+    // 监听所有配置变化
+    const configInputs = [
+        'headerVideo', 'footerVideo', 'enableSubtitle', 'subtitlePosition',
+        'extractAudio', 'fontSize', 'fontColor', 'positionX', 'positionY', 'boldText',
+        'previewName', 'previewHospital', 'previewDept', 'previewTitle'
+    ];
+
+    configInputs.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', updatePreview);
+            element.addEventListener('input', updatePreview);
+        }
+    });
+}
+
+// 更新预览
+function updatePreview() {
+    const name = document.getElementById('previewName').value;
+    const hospital = document.getElementById('previewHospital').value;
+    const dept = document.getElementById('previewDept').value;
+    const title = document.getElementById('previewTitle').value;
+
+    const fontSize = document.getElementById('fontSize').value;
+    const fontColor = document.getElementById('fontColor').value;
+    const posX = document.getElementById('positionX').value;
+    const posY = document.getElementById('positionY').value;
+    const isBold = document.getElementById('boldText').checked;
+
+    // 更新医生姓名
+    const nameOverlay = document.getElementById('doctorNameOverlay');
+    if (name && currentPhase === 'header') {
+        nameOverlay.style.display = 'block';
+        nameOverlay.style.left = posX + '%';
+        nameOverlay.style.top = posY + '%';
+        nameOverlay.style.fontSize = (parseInt(fontSize) + 6) + 'px';
+        nameOverlay.style.fontWeight = isBold ? 'bold' : 'normal';
+        nameOverlay.style.color = fontColor;
+        nameOverlay.textContent = name;
+    } else {
+        nameOverlay.style.display = 'none';
+    }
+
+    // 更新医生信息
+    const infoOverlay = document.getElementById('doctorInfoOverlay');
+    const infoText = `${hospital} ${dept} ${title}`.trim();
+    if (infoText && currentPhase === 'header') {
+        infoOverlay.style.display = 'block';
+        infoOverlay.style.left = posX + '%';
+        infoOverlay.style.top = (parseInt(posY) + 8) + '%';
+        infoOverlay.style.fontSize = fontSize + 'px';
+        infoOverlay.style.fontWeight = isBold ? 'bold' : 'normal';
+        infoOverlay.style.color = fontColor;
+        infoOverlay.style.opacity = '0.8';
+        infoOverlay.textContent = infoText;
+    } else {
+        infoOverlay.style.display = 'none';
+    }
+
+    // 更新字幕预览
+    const enableSubtitle = document.getElementById('enableSubtitle').checked;
+    const subtitlePreview = document.getElementById('subtitlePreview');
+    if (enableSubtitle) {
+        subtitlePreview.style.display = 'block';
+        const position = document.getElementById('subtitlePosition').value;
+        subtitlePreview.className = `subtitle-preview ${position}`;
+    } else {
+        subtitlePreview.style.display = 'none';
+    }
+
+    // 生成Timeline JSON
+    generateTimelineJson();
+}
+
+// 预览不同阶段
+function previewPhase(phase) {
+    currentPhase = phase;
+    updatePreview();
+
+    // 更新背景
+    const frame = document.getElementById('previewFrame');
+    if (phase === 'header') {
+        frame.style.background = 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)';
+    } else if (phase === 'main') {
+        frame.style.background = 'linear-gradient(135deg, #134e5e 0%, #71b280 100%)';
+    } else if (phase === 'footer') {
+        frame.style.background = 'linear-gradient(135deg, #141e30 0%, #243b55 100%)';
+    }
+}
+
+// 生成Timeline JSON
+function generateTimelineJson() {
+    const headerVideo = document.getElementById('headerVideo').value;
+    const footerVideo = document.getElementById('footerVideo').value;
+    const enableSubtitle = document.getElementById('enableSubtitle').checked;
+    const subtitlePosition = document.getElementById('subtitlePosition').value;
+    const extractAudio = document.getElementById('extractAudio').checked;
+
+    const timeline = {
+        VideoTracks: [{
+            VideoTrackClips: []
+        }]
+    };
+
+    // 添加片头
+    if (headerVideo) {
+        timeline.VideoTracks[0].VideoTrackClips.push({
+            MediaURL: headerVideo,
+            Duration: 3
+        });
+    }
+
+    // 添加主视频
+    timeline.VideoTracks[0].VideoTrackClips.push({
+        MediaURL: "主视频URL",
+        MainTrack: true
+    });
+
+    // 添加片尾
+    if (footerVideo) {
+        timeline.VideoTracks[0].VideoTrackClips.push({
+            MediaURL: footerVideo,
+            Duration: 3
+        });
+    }
+
+    // 添加字幕轨道
+    if (enableSubtitle) {
+        timeline.SubtitleTracks = [{
+            SubtitleTrackClips: [{
+                Type: "Text",
+                Text: "示例字幕内容",
+                FontSize: 18,
+                FontColor: "#FFFFFF"
+            }]
+        }];
+    }
+
+    const jsonStr = JSON.stringify(timeline, null, 2);
+    document.getElementById('timelineJson').textContent = jsonStr;
+}
+
+// 切换Timeline显示
+function toggleTimeline() {
+    const timeline = document.getElementById('timelineJson');
+    timeline.style.display = timeline.style.display === 'none' ? 'block' : 'none';
+}
+
+// 保存模板
+async function saveTemplate() {
+    const name = document.getElementById('templateName').value.trim();
+    if (!name) {
+        Toast.warning('请输入模板名称');
+        return;
+    }
+
+    const data = {
+        name: name,
+        description: document.getElementById('templateDescription').value,
+        header_video_url: document.getElementById('headerVideo').value,
+        footer_video_url: document.getElementById('footerVideo').value,
+        enable_subtitle: document.getElementById('enableSubtitle').checked,
+        subtitle_position: document.getElementById('subtitlePosition').value,
+        subtitle_extract_audio: document.getElementById('extractAudio').checked,
+        text_overlay_config: JSON.stringify({
+            fontSize: document.getElementById('fontSize').value,
+            fontColor: document.getElementById('fontColor').value,
+            positionX: document.getElementById('positionX').value,
+            positionY: document.getElementById('positionY').value,
+            boldText: document.getElementById('boldText').checked
+        })
+    };
+
+    try {
+        const loading = Loading.show('正在保存模板...');
+        const response = await fetch('/api/video_templates', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+        Loading.hide(loading);
+
+        if (result.success) {
+            Toast.success('模板保存成功！');
+            resetForm();
+        } else {
+            Toast.error(result.message || '保存失败');
+        }
+    } catch (error) {
+        Toast.error('保存失败：' + error.message);
+    }
+}
+
+// 重置表单
+function resetForm() {
+    document.getElementById('templateForm').reset();
+    updatePreview();
+}
+
+// 显示已保存的模板
+async function showTemplates() {
+    try {
+        const response = await fetch('/api/video_templates');
+        const result = await response.json();
+
+        if (result.success) {
+            const tbody = document.getElementById('templatesTableBody');
+            tbody.innerHTML = '';
+
+            result.templates.forEach(template => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${escapeHtml(template.name)}</strong></td>
+                    <td>${template.header_video_url ? '✓' : '-'}</td>
+                    <td>${template.footer_video_url ? '✓' : '-'}</td>
+                    <td>${template.enable_subtitle ? '✓' : '-'}</td>
+                    <td><small>${formatDate(template.created_at)}</small></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteTemplate(${template.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            const modal = new bootstrap.Modal(document.getElementById('templatesModal'));
+            modal.show();
+        }
+    } catch (error) {
+        Toast.error('获取模板列表失败');
+    }
+}
+
+// 删除模板
+async function deleteTemplate(templateId) {
+    ConfirmDialog.show('确定要删除这个模板吗？', '确认删除', async () => {
+        try {
+            const response = await fetch(`/api/video_templates/${templateId}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                Toast.success('模板删除成功');
+                showTemplates(); // 刷新列表
+            } else {
+                Toast.error(result.message || '删除失败');
+            }
+        } catch (error) {
+            Toast.error('删除失败');
+        }
+    });
+}
+
+// 工具函数
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatDate(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleString('zh-CN');
+}
+</script>
+{% endblock %}

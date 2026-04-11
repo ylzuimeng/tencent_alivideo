@@ -1,0 +1,626 @@
+{% extends "base.html" %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-user-md me-2"></i>医生信息管理</h2>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="showBatchList()">
+                <i class="fas fa-list me-1"></i>批次管理
+            </button>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#importModal">
+                <i class="fas fa-file-excel me-1"></i>批量导入
+            </button>
+        </div>
+    </div>
+
+    <!-- 搜索和筛选 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form id="searchForm" class="row g-3">
+                <div class="col-md-3">
+                    <input type="text" class="form-control" id="searchName" placeholder="搜索姓名...">
+                </div>
+                <div class="col-md-3">
+                    <input type="text" class="form-control" id="searchHospital" placeholder="筛选医院...">
+                </div>
+                <div class="col-md-3">
+                    <input type="text" class="form-control" id="searchDepartment" placeholder="筛选科室...">
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i>搜索
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="resetSearch()">
+                        <i class="fas fa-redo me-1"></i>重置
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 医生信息列表 -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>医生列表</span>
+            <span class="badge bg-primary" id="totalCount">0 条记录</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>姓名</th>
+                            <th>医院</th>
+                            <th>科室</th>
+                            <th>职称</th>
+                            <th>批次号</th>
+                            <th>校验状态</th>
+                            <th>创建时间</th>
+                            <th class="text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="doctorsTableBody">
+                        <!-- 医生信息将通过JavaScript动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页 -->
+            <nav id="pagination">
+                <ul class="pagination justify-content-center">
+                    <!-- 分页按钮将通过JavaScript动态生成 -->
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- 导入模态框 -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-file-excel me-2"></i>批量导入医生信息</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">选择Excel文件</label>
+                    <input type="file" class="form-control" id="excelFile" accept=".xlsx,.xls">
+                    <small class="form-text text-muted">
+                        支持.xlsx和.xls格式，必须包含以下列：姓名、医院、科室、职称
+                    </small>
+                </div>
+
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle me-2"></i>Excel格式说明</h6>
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>姓名</th>
+                                <th>医院</th>
+                                <th>科室</th>
+                                <th>职称</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>张三</td>
+                                <td>XX医院</td>
+                                <td>心内科</td>
+                                <td>主任医师</td>
+                            </tr>
+                            <tr>
+                                <td>李四</td>
+                                <td>YY医院</td>
+                                <td>外科</td>
+                                <td>副主任医师</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="importProgress" class="d-none">
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%">
+                            正在导入...
+                        </div>
+                    </div>
+                </div>
+
+                <div id="importResult" class="mt-3 d-none">
+                    <!-- 导入结果将在这里显示 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="importExcel()">
+                    <i class="fas fa-upload me-1"></i>导入
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 批次列表模态框 -->
+<div class="modal fade" id="batchModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-list me-2"></i>批次管理</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>批次号</th>
+                                <th>记录数</th>
+                                <th>导入时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchTableBody">
+                            <!-- 批次信息将通过JavaScript动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑模态框 -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>编辑医生信息</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <input type="hidden" id="editDoctorId">
+                    <div class="mb-3">
+                        <label class="form-label">姓名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="editName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">医院 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="editHospital" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">科室</label>
+                        <input type="text" class="form-control" id="editDepartment">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">职称</label>
+                        <input type="text" class="form-control" id="editTitle">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveDoctor()">
+                    <i class="fas fa-save me-1"></i>保存
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let currentPage = 1;
+let currentFilters = {};
+
+// 页面加载时获取医生列表
+document.addEventListener('DOMContentLoaded', function() {
+    loadDoctors();
+});
+
+// 搜索表单提交
+document.getElementById('searchForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    currentPage = 1;
+    currentFilters = {
+        name: document.getElementById('searchName').value,
+        hospital: document.getElementById('searchHospital').value,
+        department: document.getElementById('searchDepartment').value
+    };
+    loadDoctors();
+});
+
+// 加载医生列表
+async function loadDoctors() {
+    try {
+        const params = new URLSearchParams({
+            page: currentPage,
+            ...currentFilters
+        });
+
+        const response = await fetch(`/api/doctors?${params}`);
+        const result = await response.json();
+
+        if (result.success) {
+            renderDoctors(result.doctors);
+            renderPagination(result.total, result.per_page);
+            document.getElementById('totalCount').textContent = `${result.total} 条记录`;
+        } else {
+            showError(result.message || '加载医生列表失败');
+        }
+    } catch (error) {
+        console.error('加载医生列表失败:', error);
+        showError('加载医生列表失败，请稍后重试');
+    }
+}
+
+// 渲染医生列表
+function renderDoctors(doctors) {
+    const tbody = document.getElementById('doctorsTableBody');
+    tbody.innerHTML = '';
+
+    if (!doctors || doctors.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">暂无数据</td></tr>';
+        return;
+    }
+
+    doctors.forEach(doctor => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${escapeHtml(doctor.name)}</strong></td>
+            <td>${escapeHtml(doctor.hospital || '-')}</td>
+            <td>${escapeHtml(doctor.department || '-')}</td>
+            <td>${escapeHtml(doctor.title || '-')}</td>
+            <td><small>${escapeHtml(doctor.batch_id)}</small></td>
+            <td>
+                ${doctor.is_validated
+                    ? '<span class="badge bg-success">已校验</span>'
+                    : '<span class="badge bg-warning">未校验</span>'}
+            </td>
+            <td><small>${formatDate(doctor.created_at)}</small></td>
+            <td class="text-center">
+                <div class="btn-group btn-group-sm" role="group">
+                    ${!doctor.is_validated ? `
+                        <button class="btn btn-outline-success" onclick="validateDoctor(${doctor.id})" title="校验">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-outline-primary" onclick="editDoctor(${doctor.id})" title="编辑">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="deleteDoctor(${doctor.id})" title="删除">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// 渲染分页
+function renderPagination(total, perPage) {
+    const totalPages = Math.ceil(total / perPage);
+    const pagination = document.querySelector('#pagination .pagination');
+    pagination.innerHTML = '';
+
+    // 上一页
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = '<a class="page-link" href="#" onclick="changePage(' + (currentPage - 1) + ')">上一页</a>';
+    pagination.appendChild(prevLi);
+
+    // 页码
+    for (let i = 1; i <= totalPages; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" onclick="changePage(${i})">${i}</a>`;
+        pagination.appendChild(li);
+    }
+
+    // 下一页
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+    nextLi.innerHTML = '<a class="page-link" href="#" onclick="changePage(' + (currentPage + 1) + ')">下一页</a>';
+    pagination.appendChild(nextLi);
+}
+
+// 切换页面
+function changePage(page) {
+    currentPage = page;
+    loadDoctors();
+}
+
+// 重置搜索
+function resetSearch() {
+    document.getElementById('searchName').value = '';
+    document.getElementById('searchHospital').value = '';
+    document.getElementById('searchDepartment').value = '';
+    currentFilters = {};
+    currentPage = 1;
+    loadDoctors();
+}
+
+// 导入Excel
+async function importExcel() {
+    const fileInput = document.getElementById('excelFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert('请选择Excel文件');
+        return;
+    }
+
+    // 显示进度
+    document.getElementById('importProgress').classList.remove('d-none');
+    document.getElementById('importResult').classList.add('d-none');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/api/doctors/import', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        // 隐藏进度
+        document.getElementById('importProgress').classList.add('d-none');
+
+        // 显示结果
+        const resultDiv = document.getElementById('importResult');
+        resultDiv.classList.remove('d-none');
+
+        if (result.success) {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-check-circle me-2"></i>导入成功</h6>
+                    <p>${result.message}</p>
+                    <button class="btn btn-success" onclick="closeImportModal()">确定</button>
+                </div>
+            `;
+            loadDoctors();
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-exclamation-circle me-2"></i>导入失败</h6>
+                    <p>${result.message}</p>
+                    ${result.errors ? '<pre>' + escapeHtml(result.errors.join('\\n')) + '</pre>' : ''}
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('导入失败:', error);
+        document.getElementById('importProgress').classList.add('d-none');
+        showError('导入失败，请稍后重试');
+    }
+}
+
+// 关闭导入模态框
+function closeImportModal() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('importModal'));
+    modal.hide();
+    document.getElementById('excelFile').value = '';
+    document.getElementById('importResult').classList.add('d-none');
+}
+
+// 校验医生信息
+async function validateDoctor(doctorId) {
+    if (!confirm('确定要校验这条医生信息吗？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/doctors/${doctorId}/validate`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert('校验成功');
+            loadDoctors();
+        } else {
+            showError(result.message || '校验失败');
+        }
+    } catch (error) {
+        console.error('校验失败:', error);
+        showError('校验失败，请稍后重试');
+    }
+}
+
+// 编辑医生信息
+async function editDoctor(doctorId) {
+    try {
+        const response = await fetch(`/api/doctors/${doctorId}`);
+        const result = await response.json();
+
+        if (result.success) {
+            const doctor = result.doctor;
+            document.getElementById('editDoctorId').value = doctor.id;
+            document.getElementById('editName').value = doctor.name;
+            document.getElementById('editHospital').value = doctor.hospital;
+            document.getElementById('editDepartment').value = doctor.department || '';
+            document.getElementById('editTitle').value = doctor.title || '';
+
+            const modal = new bootstrap.Modal(document.getElementById('editModal'));
+            modal.show();
+        } else {
+            showError(result.message || '获取医生信息失败');
+        }
+    } catch (error) {
+        console.error('获取医生信息失败:', error);
+        showError('获取医生信息失败，请稍后重试');
+    }
+}
+
+// 保存医生信息
+async function saveDoctor() {
+    const doctorId = document.getElementById('editDoctorId').value;
+    const data = {
+        name: document.getElementById('editName').value,
+        hospital: document.getElementById('editHospital').value,
+        department: document.getElementById('editDepartment').value,
+        title: document.getElementById('editTitle').value
+    };
+
+    if (!data.name || !data.hospital) {
+        alert('姓名和医院为必填项');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/doctors/${doctorId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
+            modal.hide();
+            loadDoctors();
+        } else {
+            showError(result.message || '保存失败');
+        }
+    } catch (error) {
+        console.error('保存失败:', error);
+        showError('保存失败，请稍后重试');
+    }
+}
+
+// 删除医生信息
+async function deleteDoctor(doctorId) {
+    if (!confirm('确定要删除这条医生信息吗？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/doctors/${doctorId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert('删除成功');
+            loadDoctors();
+        } else {
+            showError(result.message || '删除失败');
+        }
+    } catch (error) {
+        console.error('删除失败:', error);
+        showError('删除失败，请稍后重试');
+    }
+}
+
+// 显示批次列表
+async function showBatchList() {
+    try {
+        const response = await fetch('/api/doctors/batches');
+        const result = await response.json();
+
+        if (result.success) {
+            const tbody = document.getElementById('batchTableBody');
+            tbody.innerHTML = '';
+
+            result.batches.forEach(batch => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><small>${escapeHtml(batch.batch_id)}</small></td>
+                    <td>${batch.count} 条</td>
+                    <td><small>${formatDate(batch.created_at)}</small></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="filterByBatch('${batch.batch_id}')">
+                            查看
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            const modal = new bootstrap.Modal(document.getElementById('batchModal'));
+            modal.show();
+        } else {
+            showError(result.message || '获取批次列表失败');
+        }
+    } catch (error) {
+        console.error('获取批次列表失败:', error);
+        showError('获取批次列表失败，请稍后重试');
+    }
+}
+
+// 按批次筛选
+function filterByBatch(batchId) {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('batchModal'));
+    modal.hide();
+
+    currentFilters = {batch_id: batchId};
+    currentPage = 1;
+    loadDoctors();
+}
+
+// 显示错误消息
+function showError(message) {
+    alert(message);
+}
+
+// HTML转义
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 格式化日期
+function formatDate(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleString('zh-CN');
+}
+</script>
+
+<style>
+.table th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.badge {
+    font-size: 0.8em;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+#pagination {
+    margin-top: 20px;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid #dee2e6;
+}
+</style>
+{% endblock %}
