@@ -253,7 +253,8 @@ def taskstyles():
 
 @app.route('/video_templates')
 def video_templates():
-    """视频模板配置页面（新版）"""
+    """视频模板配置页面 - 重定向到统一界面"""
+    return redirect('/templates/unified')
     files = File.query.all()  # 从File表获取视频素材，而不是Template表
     return render_template('video_templates.html', files=files)
 
@@ -1025,6 +1026,8 @@ def get_video_templates():
                     'enable_subtitle': t.enable_subtitle,
                     'subtitle_position': t.subtitle_position,
                     'subtitle_extract_audio': t.subtitle_extract_audio,
+                    'is_advanced': t.is_advanced,  # 新增：标识高级模板
+                    'category': t.category,  # 新增：模板分类
                     'description': t.description,
                     'created_at': t.created_at.isoformat()
                 }
@@ -1091,6 +1094,90 @@ def delete_video_template(template_id):
         db.session.rollback()
         logger.error(f"删除视频模板失败: {str(e)}")
         return jsonify({'success': False, 'message': f'删除失败: {str(e)}'}), 500
+
+
+# ==================== 模式转换API ====================
+
+@app.route('/api/video_templates/convert-demo', methods=['POST'])
+def convert_template_demo():
+    """模式转换演示API（不保存，仅返回结果）"""
+    try:
+        from services.template_converter import TemplateConverter
+
+        data = request.get_json()
+        mode = data.get('mode')
+
+        if mode == 'simple-to-advanced':
+            # 简单模式 → 高级模式
+            simple_data = data.get('data', {})
+
+            # 创建临时模板对象
+            temp_template = VideoTemplate(
+                name=simple_data.get('name', '临时模板'),
+                header_video_url=simple_data.get('header_video_url'),
+                footer_video_url=simple_data.get('footer_video_url'),
+                enable_subtitle=simple_data.get('enable_subtitle', False),
+                subtitle_position=simple_data.get('subtitle_position', 'bottom'),
+                subtitle_extract_audio=simple_data.get('subtitle_extract_audio', True),
+                text_overlay_config=simple_data.get('text_overlay_config')
+            )
+
+            result = TemplateConverter.simple_to_advanced(temp_template)
+            return jsonify({'success': True, **result})
+
+        elif mode == 'advanced-to-simple':
+            # 高级模式 → 简单模式
+            timeline_json = data.get('timeline_json')
+
+            if not timeline_json:
+                return jsonify({'success': False, 'message': 'Timeline JSON不能为空'}), 400
+
+            # 创建临时模板对象
+            temp_template = VideoTemplate(
+                name='临时模板',
+                timeline_json=timeline_json,
+                is_advanced=True
+            )
+
+            result = TemplateConverter.advanced_to_simple(temp_template)
+            return jsonify({'success': True, 'data': result})
+
+        else:
+            return jsonify({'success': False, 'message': f'无效的转换模式: {mode}'}), 400
+
+    except Exception as e:
+        logger.error(f"模式转换失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'转换失败: {str(e)}'}), 500
+
+
+@app.route('/api/video_templates/validate-timeline', methods=['POST'])
+def validate_timeline_json():
+    """验证Timeline JSON格式"""
+    try:
+        from services.template_converter import TemplateConverter
+
+        data = request.get_json()
+        timeline_json = data.get('timeline_json', '')
+
+        is_valid, error_msg = TemplateConverter.validate_timeline_json(timeline_json)
+
+        return jsonify({
+            'success': is_valid,
+            'valid': is_valid,
+            'message': error_msg if error_msg else 'Timeline JSON格式正确'
+        })
+
+    except Exception as e:
+        logger.error(f"验证Timeline失败: {str(e)}")
+        return jsonify({'success': False, 'valid': False, 'message': str(e)}), 500
+
+
+# ==================== 统一模板管理页面 ====================
+
+@app.route('/templates/unified')
+def unified_templates_page():
+    """统一模板管理页面"""
+    return render_template('unified_templates.html')
 
 
 # ==================== 高级Timeline模板API（支持占位符）====================
@@ -1299,7 +1386,8 @@ def preview_advanced_template(template_id):
 
 @app.route('/advanced_templates')
 def advanced_templates_page():
-    """高级模板管理页面"""
+    """高级模板管理页面 - 重定向到统一界面"""
+    return redirect('/templates/unified')
     return render_template('advanced_templates.html')
 
 

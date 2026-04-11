@@ -240,3 +240,43 @@ function getCategoryName(category) {
 
 // 页面加载时执行
 document.addEventListener('DOMContentLoaded', loadTemplates);
+
+// 快速模板功能
+function insertQuickTemplate(preset) {
+    const textarea = document.querySelector('[name="timeline_json"]');
+
+    const templates = {
+        'standard': {
+            "VideoTracks": [{
+                "VideoTrackClips": [
+                    {"MediaURL": "$header_video", "Duration": 3},
+                    {"MediaURL": "$main_video", "MainTrack": true},
+                    {"MediaURL": "$footer_video", "Duration": 3}
+                ]
+            }]
+        },
+        'main-first': {
+            "VideoTracks": [{
+                "VideoTrackClips": [
+                    {"MediaURL": "$main_video", "MainTrack": true},
+                    {"MediaURL": "$header_video", "Duration": 3},
+                    {"MediaURL": "$footer_video", "Duration": 3}
+                ]
+            }]
+        },
+        'main-last': {
+            "VideoTracks": [{
+                "VideoTrackClips": [
+                    {"MediaURL": "$header_video", "Duration": 3},
+                    {"MediaURL": "$footer_video", "Duration": 3},
+                    {"MediaURL": "$main_video", "MainTrack": true}
+                ]
+            }]
+        }
+    };
+
+    if (templates[preset]) {
+        textarea.value = JSON.stringify(templates[preset], null, 2);
+    }
+}
+

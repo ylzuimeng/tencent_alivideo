@@ -76,13 +76,46 @@
                         </label>
                         <textarea class="form-control font-monospace" name="timeline_json" rows="10" required
                                   placeholder='{"VideoTracks": [{"VideoTrackClips": [{"MediaURL": "$main_video", "MainTrack": true}]}]}'></textarea>
+
+                        <div class="mt-2 mb-3">
+                            <label class="form-label">快速模板</label>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                        onclick="insertQuickTemplate('standard')">
+                                    标准位置
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                        onclick="insertQuickTemplate('main-first')">
+                                    主视频优先
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                        onclick="insertQuickTemplate('main-last')">
+                                    主视频最后
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="form-text">
-                            支持占位符:
-                            <code>$main_video</code>,
-                            <code>$mainSubtitleDepart</code> (医院科室-竖排),
-                            <code>$mainSubtitleName</code> (姓名职称-竖排),
-                            <code>$beginingSubtitleTitle</code> (视频标题),
-                            <code>$beginingAudioTitle</code> (视频标题-TTS)
+                            <div class="alert alert-primary mb-2">
+                                <strong>💡 灵活的主视频位置配置：</strong>
+                                <code>$main_video</code> 占位符可以放在 Timeline JSON 的任意位置！
+                            </div>
+                            <div class="mb-2">
+                                <strong>支持的主视频位置配置：</strong>
+                                <ul class="mb-0">
+                                    <li><strong>标准位置：</strong>片头 → <code>$main_video</code> → 片尾</li>
+                                    <li><strong>主视频优先：</strong><code>$main_video</code> → 片头 → 片尾</li>
+                                    <li><strong>主视频最后：</strong>片头 → 片尾 → <code>$main_video</code></li>
+                                    <li><strong>任意位置：</strong>支持多个 <code>$main_video</code> 出现或与片头片尾混合编排</li>
+                                </ul>
+                            </div>
+                            <div class="mb-2">
+                                <strong>其他占位符：</strong>
+                                <code>$mainSubtitleDepart</code> (医院科室-竖排),
+                                <code>$mainSubtitleName</code> (姓名职称-竖排),
+                                <code>$beginingSubtitleTitle</code> (视频标题),
+                                <code>$beginingAudioTitle</code> (TTS语音)
+                            </div>
                         </div>
                     </div>
 
