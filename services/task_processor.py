@@ -11,11 +11,13 @@ import os
 import json
 import time
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional, Dict, List
 
-from models import db, ProcessingTask, File, TaskStyle
+from flask import current_app
+from models import db, ProcessingTask, File, TaskStyle, DoctorInfo, VideoTemplate
 from services.ice_service import ICEClient
 
 logger = logging.getLogger(__name__)
@@ -34,12 +36,23 @@ class TaskProcessor:
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.running = False
         self.poll_thread = None
+        self._app_context = None
+
+    def get_app_context(self):
+        """获取Flask应用上下文"""
+        if self._app_context is None or not self._app_context.push():
+            from app import app
+            self._app_context = app.app_context()
+        return self._app_context
 
     def create_task(
         self,
         task_name: str,
         source_file_id: int,
-        task_style_id: Optional[int] = None
+        task_style_id: Optional[int] = None,
+        doctor_info_id: Optional[int] = None,
+        video_template_id: Optional[int] = None,
+        use_advanced_timeline: bool = False
     ) -> ProcessingTask:
         """
         创建处理任务
@@ -47,7 +60,10 @@ class TaskProcessor:
         Args:
             task_name: 任务名称
             source_file_id: 源视频文件ID
-            task_style_id: TaskStyle模板ID（可选）
+            task_style_id: TaskStyle模板ID（可选，兼容旧版）
+            doctor_info_id: 医生信息ID（可选）
+            video_template_id: 视频模板ID（可选）
+            use_advanced_timeline: 是否使用高级Timeline（占位符）
 
         Returns:
             ProcessingTask实例
@@ -57,6 +73,9 @@ class TaskProcessor:
                 task_name=task_name,
                 source_file_id=source_file_id,
                 task_style_id=task_style_id,
+                doctor_info_id=doctor_info_id,
+                video_template_id=video_template_id,
+                use_advanced_timeline=use_advanced_timeline,
                 status='pending'
             )
             db.session.add(task)
@@ -64,8 +83,33 @@ class TaskProcessor:
 
             logger.info(f"创建任务成功: {task_name} (ID: {task.id})")
 
-            # 异步提交ICE作业
-            self.executor.submit(self._process_task, task.id)
+            # 异步提交ICE作业（添加异常处理）
+            future = self.executor.submit(self._process_task, task.id)
+
+            # 添加异常回调
+            def log_exception(future):
+                try:
+                    future.result(timeout=300)  # 5分钟超时
+                except Exception as e:
+                    logger.error(f"任务{task.id}处理失败: {str(e)}", exc_info=True)
+                    # 更新数据库状态为失败
+                    try:
+                        with self.get_app_context():
+                            failed_task = ProcessingTask.query.get(task.id)
+                            if failed_task and failed_task.status == 'pending':
+                                failed_task.status = 'failed'
+                                failed_task.error_message = str(e)[:500]
+                                db.session.commit()
+                    except Exception as db_error:
+                        logger.error(f"更新任务失败状态时出错: {db_error}")
+
+            # 使用单独的线程来监控Future
+            import threading
+            def monitor_future():
+                log_exception(future)
+
+            monitor_thread = threading.Thread(target=monitor_future, daemon=True)
+            monitor_thread.start()
 
             return task
 
@@ -81,51 +125,58 @@ class TaskProcessor:
         Args:
             task_id: 任务ID
         """
-        task = ProcessingTask.query.get(task_id)
-        if not task:
-            logger.error(f"任务不存在: {task_id}")
-            return
+        # 关键修复：在新线程中创建应用上下文
+        with self.get_app_context():
+            task = ProcessingTask.query.get(task_id)
+            if not task:
+                logger.error(f"任务不存在: {task_id}")
+                return
 
-        try:
-            # 更新状态为处理中
-            task.status = 'processing'
-            task.progress = 10
-            db.session.commit()
+            try:
+                # 更新状态为处理中
+                task.status = 'processing'
+                task.progress = 10
+                db.session.commit()
 
-            # 获取源文件
-            source_file = File.query.get(task.source_file_id)
-            if not source_file:
-                raise Exception(f"源文件不存在: {task.source_file_id}")
+                # 获取源文件
+                source_file = File.query.get(task.source_file_id)
+                if not source_file:
+                    raise Exception(f"源文件不存在: {task.source_file_id}")
 
-            # 构建Timeline
-            ice_client = ICEClient()
-            timeline = self._build_timeline(task, source_file.oss_url)
+                # 构建Timeline
+                ice_client = ICEClient()
+                timeline = self._build_timeline(task, source_file.oss_url)
 
-            # 生成输出URL
-            output_url = self._generate_output_url(task)
+                # 生成输出URL
+                output_url = self._generate_output_url(task)
 
-            # 提交ICE作业
-            logger.info(f"提交ICE作业: 任务ID={task_id}")
-            job_info = ice_client.submit_editing_job(timeline, output_url)
+                # 提交ICE作业
+                logger.info(f"提交ICE作业: 任务ID={task_id}")
+                job_info = ice_client.submit_editing_job(timeline, output_url)
 
-            # 更新任务信息
-            task.ice_job_id = job_info['job_id']
-            task.ice_project_id = job_info['project_id']
-            task.progress = 20
-            db.session.commit()
+                # 更新任务信息
+                task.ice_job_id = job_info['job_id']
+                task.ice_project_id = job_info['project_id']
+                task.progress = 20
+                db.session.commit()
 
-            # 轮询作业状态
-            self._poll_job_status(task)
+                # 轮询作业状态
+                self._poll_job_status(task)
 
-        except Exception as e:
-            logger.error(f"处理任务失败: {str(e)}")
-            task.status = 'failed'
-            task.error_message = str(e)
-            db.session.commit()
+            except Exception as e:
+                logger.error(f"处理任务失败: {str(e)}")
+                task.status = 'failed'
+                task.error_message = str(e)
+                db.session.commit()
 
     def _build_timeline(self, task: ProcessingTask, main_video_url: str) -> str:
         """
         构建Timeline JSON
+
+        优先级：
+        1. VideoTemplate with is_advanced=True（新系统，支持占位符）
+        2. VideoTemplate with is_advanced=False（兼容旧版）
+        3. TaskStyle（旧版兼容）
 
         Args:
             task: ProcessingTask实例
@@ -134,16 +185,49 @@ class TaskProcessor:
         Returns:
             Timeline JSON字符串
         """
-        if task.task_style_id:
-            # 使用TaskStyle模板
+        ice_client = ICEClient()
+
+        # 1. 新系统：高级VideoTemplate（支持占位符）
+        if task.video_template_id and task.use_advanced_timeline:
+            video_template = VideoTemplate.query.get(task.video_template_id)
+            if not video_template:
+                raise Exception(f"VideoTemplate不存在: {task.video_template_id}")
+
+            if not video_template.is_advanced:
+                raise Exception(f"VideoTemplate '{video_template.name}' 不是高级模板（is_advanced=False）")
+
+            # 获取医生信息
+            doctor_info = None
+            if task.doctor_info_id:
+                doctor_info = DoctorInfo.query.get(task.doctor_info_id)
+
+            # 使用高级模板生成Timeline（支持占位符）
+            return ice_client.create_timeline_from_advanced_template(video_template, main_video_url, doctor_info)
+
+        # 2. 兼容旧版：普通VideoTemplate
+        elif task.video_template_id:
+            video_template = VideoTemplate.query.get(task.video_template_id)
+            if not video_template:
+                raise Exception(f"VideoTemplate不存在: {task.video_template_id}")
+
+            # 获取医生信息
+            doctor_info = None
+            if task.doctor_info_id:
+                doctor_info = DoctorInfo.query.get(task.doctor_info_id)
+
+            # 使用增强的Timeline生成（支持文字叠加）
+            return ice_client.create_timeline_with_overlay(video_template, main_video_url, doctor_info)
+
+        # 3. 兼容旧版：TaskStyle
+        elif task.task_style_id:
             task_style = TaskStyle.query.get(task.task_style_id)
             if not task_style:
                 raise Exception(f"TaskStyle不存在: {task.task_style_id}")
 
-            ice_client = ICEClient()
             return ice_client.create_timeline_from_taskstyle(task_style, main_video_url)
+
+        # 4. 不使用模板，直接使用主视频
         else:
-            # 不使用模板，直接使用主视频
             return json.dumps({
                 "VideoTracks": [{
                     "VideoTrackClips": [{
@@ -246,7 +330,7 @@ class TaskProcessor:
             'task_name': task.task_name,
             'status': task.status,
             'progress': task.progress,
-            'output_url': task.output_oss_url,
+            'output_oss_url': task.output_oss_url,
             'error_message': task.error_message,
             'created_at': task.created_at.isoformat(),
             'completed_at': task.completed_at.isoformat() if task.completed_at else None

@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from werkzeug.utils import secure_filename
-from models import db, File, Template, TaskStyle, ProcessingTask
+from models import db, File, Template, TaskStyle, ProcessingTask, DoctorInfo, VideoTemplate
 import os
 import logging
 from datetime import datetime
@@ -182,6 +182,46 @@ with app.app_context():
 def files():
     files = File.query.all()
     return render_template('files.html', files=files)
+
+@app.route('/files/enhanced')
+def files_enhanced():
+    """增强版文件管理页面（支持视频预览）"""
+    return render_template('files_enhanced.html')
+
+@app.route('/test/api')
+def test_api():
+    """API 测试页面"""
+    return render_template('test_api.html')
+
+
+# ==================== 文件管理API ====================
+
+@app.route('/api/files', methods=['GET'])
+def get_files_api():
+    """获取文件列表API"""
+    try:
+        files = File.query.order_by(File.upload_time.desc()).all()
+        return jsonify({
+            'success': True,
+            'files': [
+                {
+                    'id': f.id,
+                    'filename': f.filename,
+                    'oss_url': f.oss_url,
+                    'size': f.size,
+                    'upload_time': f.upload_time.isoformat()
+                }
+                for f in files
+            ]
+        })
+    except Exception as e:
+        logger.error(f"获取文件列表失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/doctors')
+def doctors():
+    """医生信息管理页面"""
+    return render_template('doctors.html')
 # 路由处理
 @app.route('/')
 def index():
@@ -190,6 +230,11 @@ def index():
 @app.route('/upload/video')
 def upload():
     return render_template('upload_videos.html')
+
+@app.route('/upload/enhanced')
+def upload_enhanced():
+    """增强版视频上传页面"""
+    return render_template('upload_enhanced.html')
 
 @app.route('/task_list')
 def task_list():
@@ -205,6 +250,12 @@ def taskstyles():
     files = Template.query.all()
     taskstyles = TaskStyle.query.all()
     return render_template('taskstyles.html', files=files, taskstyles=taskstyles)
+
+@app.route('/video_templates')
+def video_templates():
+    """视频模板配置页面（新版）"""
+    files = File.query.all()  # 从File表获取视频素材，而不是Template表
+    return render_template('video_templates.html', files=files)
 
 # 获取模板列表API
 @app.route('/api/templates')
@@ -524,11 +575,21 @@ def create_task():
         # 导入任务处理器
         from services.task_processor import task_processor
 
+        # 检查是否使用高级模板（支持占位符）
+        use_advanced_timeline = False
+        if data.get('video_template_id'):
+            template = VideoTemplate.query.get(data['video_template_id'])
+            if template and template.is_advanced:
+                use_advanced_timeline = True
+
         # 创建任务
         task = task_processor.create_task(
             task_name=task_name,
             source_file_id=data['source_file_id'],
-            task_style_id=data.get('task_style_id')
+            task_style_id=data.get('task_style_id'),
+            doctor_info_id=data.get('doctor_info_id'),
+            video_template_id=data.get('video_template_id'),
+            use_advanced_timeline=use_advanced_timeline
         )
 
         return jsonify({
@@ -650,6 +711,596 @@ def delete_task(task_id):
         db.session.rollback()
         logger.error(f"删除任务失败: {str(e)}")
         return jsonify({'error': f'删除任务失败: {str(e)}'}), 500
+
+
+@app.route('/api/tasks/<int:task_id>/retry', methods=['POST'])
+def retry_task(task_id):
+    """重试失败的任务"""
+    try:
+        from services.task_processor import task_processor
+
+        task = ProcessingTask.query.get_or_404(task_id)
+
+        # 检查任务状态
+        if task.status != 'failed':
+            return jsonify({'error': '只能重试失败的任务'}), 400
+
+        # 重置任务状态
+        task.status = 'pending'
+        task.progress = 0
+        task.error_message = None
+        db.session.commit()
+
+        # 重新提交处理
+        task_processor.executor.submit(task_processor._process_task, task.id)
+
+        return jsonify({'message': '任务已重新提交处理'})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"重试任务失败: {str(e)}")
+        return jsonify({'error': f'重试失败: {str(e)}'}), 500
+
+    """删除任务"""
+    try:
+        task = ProcessingTask.query.get_or_404(task_id)
+
+        # 如果任务已完成，尝试删除OSS上的成品文件
+        if task.status == 'completed' and task.output_oss_url:
+            try:
+                oss_config = OSSConfig()
+                oss_client = OSSClient(oss_config)
+                filename = task.output_oss_url.split('/')[-1]
+                oss_path = f"processed_videos/{filename}"
+                oss_client.delete_file(oss_path)
+                logger.info(f"已删除成品文件: {oss_path}")
+            except Exception as e:
+                logger.warning(f"删除OSS文件失败: {str(e)}")
+
+        # 删除数据库记录
+        db.session.delete(task)
+        db.session.commit()
+
+        return jsonify({'message': '任务删除成功'})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"删除任务失败: {str(e)}")
+        return jsonify({'error': f'删除任务失败: {str(e)}'}), 500
+
+
+# ==================== 医生信息管理API ====================
+
+@app.route('/api/doctors/import', methods=['POST'])
+def import_doctors():
+    """导入医生信息Excel文件"""
+    try:
+        from services.doctor_service import doctor_service
+
+        # 验证文件存在
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': '没有文件上传'}), 400
+
+        file = request.files['file']
+
+        # 验证文件名
+        if file.filename == '':
+            return jsonify({'success': False, 'message': '没有选择文件'}), 400
+
+        # 验证文件类型
+        if not doctor_service.allowed_file(file.filename):
+            return jsonify({'success': False, 'message': '不支持的文件格式，请上传.xlsx或.xls文件'}), 400
+
+        # 保存临时文件
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+            file.save(tmp_file.name)
+            tmp_file_path = tmp_file.name
+
+        try:
+            # 导入数据
+            success, message, doctors = doctor_service.import_from_excel(tmp_file_path)
+
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': message,
+                    'count': len(doctors)
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': message
+                }), 400
+
+        finally:
+            # 删除临时文件
+            import os
+            try:
+                os.unlink(tmp_file_path)
+            except:
+                pass
+
+    except Exception as e:
+        logger.error(f"导入医生信息失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'导入失败: {str(e)}'}), 500
+
+
+@app.route('/api/doctors', methods=['GET'])
+def get_doctors():
+    """获取医生列表"""
+    try:
+        from services.doctor_service import doctor_service
+
+        # 获取分页和筛选参数
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        search = request.args.get('search')
+        hospital = request.args.get('hospital')
+        department = request.args.get('department')
+        batch_id = request.args.get('batch_id')
+
+        # 查询数据
+        doctors, total = doctor_service.get_doctors(
+            page=page,
+            per_page=per_page,
+            search=search,
+            hospital=hospital,
+            department=department,
+            batch_id=batch_id
+        )
+
+        # 返回结果
+        return jsonify({
+            'success': True,
+            'doctors': [
+                {
+                    'id': d.id,
+                    'name': d.name,
+                    'hospital': d.hospital,
+                    'department': d.department,
+                    'title': d.title,
+                    'batch_id': d.batch_id,
+                    'is_validated': d.is_validated,
+                    'created_at': d.created_at.isoformat()
+                }
+                for d in doctors
+            ],
+            'total': total,
+            'per_page': per_page
+        })
+
+    except Exception as e:
+        logger.error(f"获取医生列表失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'获取列表失败: {str(e)}'}), 500
+
+
+@app.route('/api/doctors/<int:doctor_id>', methods=['GET'])
+def get_doctor(doctor_id):
+    """获取医生详情"""
+    try:
+        from services.doctor_service import doctor_service
+
+        doctor = doctor_service.get_doctor_by_id(doctor_id)
+        if not doctor:
+            return jsonify({'success': False, 'message': '医生信息不存在'}), 404
+
+        return jsonify({
+            'success': True,
+            'doctor': {
+                'id': doctor.id,
+                'name': doctor.name,
+                'hospital': doctor.hospital,
+                'department': doctor.department,
+                'title': doctor.title,
+                'batch_id': doctor.batch_id,
+                'is_validated': doctor.is_validated,
+                'created_at': doctor.created_at.isoformat()
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"获取医生详情失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'获取详情失败: {str(e)}'}), 500
+
+
+@app.route('/api/doctors/<int:doctor_id>', methods=['PUT'])
+def update_doctor(doctor_id):
+    """更新医生信息"""
+    try:
+        from services.doctor_service import doctor_service
+
+        data = request.get_json()
+        success, message = doctor_service.update_doctor(doctor_id, **data)
+
+        if success:
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'message': message}), 400
+
+    except Exception as e:
+        logger.error(f"更新医生信息失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'}), 500
+
+
+@app.route('/api/doctors/<int:doctor_id>', methods=['DELETE'])
+def delete_doctor(doctor_id):
+    """删除医生信息"""
+    try:
+        from services.doctor_service import doctor_service
+
+        success, message = doctor_service.delete_doctor(doctor_id)
+
+        if success:
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'message': message}), 400
+
+    except Exception as e:
+        logger.error(f"删除医生信息失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'}), 500
+
+
+@app.route('/api/doctors/<int:doctor_id>/validate', methods=['POST'])
+def validate_doctor(doctor_id):
+    """校验医生信息"""
+    try:
+        from services.doctor_service import doctor_service
+
+        success, message = doctor_service.validate_doctor(doctor_id)
+
+        if success:
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'message': message}), 400
+
+    except Exception as e:
+        logger.error(f"校验医生信息失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'校验失败: {str(e)}'}), 500
+
+
+@app.route('/api/doctors/batches', methods=['GET'])
+def get_batches():
+    """获取批次列表"""
+    try:
+        from services.doctor_service import doctor_service
+
+        batches = doctor_service.get_batch_list()
+        return jsonify({'success': True, 'batches': batches})
+
+    except Exception as e:
+        logger.error(f"获取批次列表失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'获取批次列表失败: {str(e)}'}), 500
+
+
+# ==================== 视频模板管理API ====================
+
+@app.route('/api/video_templates', methods=['POST'])
+def create_video_template():
+    """创建视频模板"""
+    try:
+        data = request.get_json()
+
+        # 创建模板
+        template = VideoTemplate(
+            name=data.get('name'),
+            header_video_url=data.get('header_video_url'),
+            footer_video_url=data.get('footer_video_url'),
+            enable_subtitle=data.get('enable_subtitle', False),
+            subtitle_position=data.get('subtitle_position', 'bottom'),
+            subtitle_extract_audio=data.get('subtitle_extract_audio', True),
+            text_overlay_config=data.get('text_overlay_config'),
+            description=data.get('description', '')
+        )
+
+        db.session.add(template)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': '模板创建成功',
+            'template_id': template.id
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"创建视频模板失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'创建失败: {str(e)}'}), 500
+
+
+@app.route('/api/video_templates', methods=['GET'])
+def get_video_templates():
+    """获取视频模板列表"""
+    try:
+        templates = VideoTemplate.query.order_by(VideoTemplate.created_at.desc()).all()
+
+        return jsonify({
+            'success': True,
+            'templates': [
+                {
+                    'id': t.id,
+                    'name': t.name,
+                    'header_video_url': t.header_video_url,
+                    'footer_video_url': t.footer_video_url,
+                    'enable_subtitle': t.enable_subtitle,
+                    'subtitle_position': t.subtitle_position,
+                    'subtitle_extract_audio': t.subtitle_extract_audio,
+                    'description': t.description,
+                    'created_at': t.created_at.isoformat()
+                }
+                for t in templates
+            ]
+        })
+
+    except Exception as e:
+        logger.error(f"获取视频模板列表失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'获取列表失败: {str(e)}'}), 500
+
+
+@app.route('/api/video_templates/<int:template_id>', methods=['PUT'])
+def update_video_template(template_id):
+    """更新视频模板"""
+    try:
+        template = VideoTemplate.query.get_or_404(template_id)
+        data = request.get_json()
+
+        # 更新字段
+        if 'name' in data:
+            template.name = data['name']
+        if 'header_video_url' in data:
+            template.header_video_url = data['header_video_url']
+        if 'footer_video_url' in data:
+            template.footer_video_url = data['footer_video_url']
+        if 'enable_subtitle' in data:
+            template.enable_subtitle = data['enable_subtitle']
+        if 'subtitle_position' in data:
+            template.subtitle_position = data['subtitle_position']
+        if 'subtitle_extract_audio' in data:
+            template.subtitle_extract_audio = data['subtitle_extract_audio']
+        if 'text_overlay_config' in data:
+            template.text_overlay_config = data['text_overlay_config']
+        if 'description' in data:
+            template.description = data['description']
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': '更新成功'})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"更新视频模板失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'}), 500
+
+
+@app.route('/api/video_templates/<int:template_id>', methods=['DELETE'])
+def delete_video_template(template_id):
+    """删除视频模板"""
+    try:
+        template = VideoTemplate.query.get_or_404(template_id)
+
+        # 检查是否有关联的处理任务
+        if template.processing_tasks.count() > 0:
+            return jsonify({'success': False, 'message': '该模板已关联处理任务，无法删除'}), 400
+
+        db.session.delete(template)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': '删除成功'})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"删除视频模板失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'}), 500
+
+
+# ==================== 高级Timeline模板API（支持占位符）====================
+
+@app.route('/api/video_templates/advanced', methods=['POST'])
+def create_advanced_template():
+    """创建高级VideoTemplate（支持占位符）"""
+    try:
+        data = request.get_json()
+
+        # 验证必填字段
+        if 'name' not in data or 'timeline_json' not in data:
+            return jsonify({'success': False, 'message': '缺少必填字段: name, timeline_json'}), 400
+
+        # 验证timeline_json格式
+        try:
+            json.loads(data['timeline_json'])
+        except json.JSONDecodeError:
+            return jsonify({'success': False, 'message': 'timeline_json 格式错误'}), 400
+
+        # 创建模板
+        template = VideoTemplate(
+            name=data['name'],
+            timeline_json=data['timeline_json'],
+            output_media_config=data.get('output_media_config'),
+            editing_produce_config=data.get('editing_produce_config'),
+            formatter_type=data.get('formatter_type', 'default'),
+            category=data.get('category', 'medical'),
+            is_advanced=True,
+            thumbnail_url=data.get('thumbnail_url'),
+            description=data.get('description', '')
+        )
+
+        db.session.add(template)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': '高级模板创建成功',
+            'template_id': template.id
+        })
+
+    except Exception as e:
+        logger.error(f"创建高级模板失败: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/video_templates/advanced', methods=['GET'])
+def get_advanced_templates():
+    """获取高级VideoTemplate列表"""
+    try:
+        category = request.args.get('category')
+        query = VideoTemplate.query.filter_by(is_advanced=True)
+
+        if category:
+            query = query.filter_by(category=category)
+
+        templates = query.order_by(VideoTemplate.created_at.desc()).all()
+
+        return jsonify({
+            'success': True,
+            'templates': [
+                {
+                    'id': t.id,
+                    'name': t.name,
+                    'description': t.description,
+                    'category': t.category,
+                    'formatter_type': t.formatter_type,
+                    'thumbnail_url': t.thumbnail_url,
+                    'is_advanced': t.is_advanced,
+                    'created_at': t.created_at.isoformat()
+                }
+                for t in templates
+            ]
+        })
+
+    except Exception as e:
+        logger.error(f"获取高级模板列表失败: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/video_templates/advanced/<int:template_id>', methods=['GET'])
+def get_advanced_template(template_id):
+    """获取高级模板详情"""
+    try:
+        template = VideoTemplate.query.filter_by(id=template_id, is_advanced=True).first()
+        if not template:
+            return jsonify({'success': False, 'message': '模板不存在'}), 404
+
+        return jsonify({
+            'success': True,
+            'template': {
+                'id': template.id,
+                'name': template.name,
+                'description': template.description,
+                'timeline_json': template.timeline_json,
+                'output_media_config': template.output_media_config,
+                'editing_produce_config': template.editing_produce_config,
+                'formatter_type': template.formatter_type,
+                'category': template.category,
+                'thumbnail_url': template.thumbnail_url,
+                'is_advanced': template.is_advanced,
+                'created_at': template.created_at.isoformat()
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"获取模板详情失败: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/video_templates/advanced/<int:template_id>', methods=['PUT'])
+def update_advanced_template(template_id):
+    """更新高级模板"""
+    try:
+        template = VideoTemplate.query.filter_by(id=template_id, is_advanced=True).first()
+        if not template:
+            return jsonify({'success': False, 'message': '模板不存在'}), 404
+
+        data = request.get_json()
+
+        # 更新字段
+        if 'name' in data:
+            template.name = data['name']
+        if 'description' in data:
+            template.description = data['description']
+        if 'timeline_json' in data:
+            # 验证JSON格式
+            try:
+                json.loads(data['timeline_json'])
+                template.timeline_json = data['timeline_json']
+            except json.JSONDecodeError:
+                return jsonify({'success': False, 'message': 'timeline_json 格式错误'}), 400
+        if 'output_media_config' in data:
+            template.output_media_config = data['output_media_config']
+        if 'editing_produce_config' in data:
+            template.editing_produce_config = data['editing_produce_config']
+        if 'formatter_type' in data:
+            template.formatter_type = data['formatter_type']
+        if 'category' in data:
+            template.category = data['category']
+        if 'thumbnail_url' in data:
+            template.thumbnail_url = data['thumbnail_url']
+
+        template.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': '更新成功'})
+
+    except Exception as e:
+        logger.error(f"更新模板失败: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/video_templates/advanced/<int:template_id>', methods=['DELETE'])
+def delete_advanced_template(template_id):
+    """删除高级模板"""
+    try:
+        template = VideoTemplate.query.filter_by(id=template_id, is_advanced=True).first()
+        if not template:
+            return jsonify({'success': False, 'message': '模板不存在'}), 404
+
+        # 检查是否有关联的处理任务
+        if template.processing_tasks.count() > 0:
+            return jsonify({'success': False, 'message': '该模板已关联处理任务，无法删除'}), 400
+
+        db.session.delete(template)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': '删除成功'})
+
+    except Exception as e:
+        logger.error(f"删除模板失败: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/video_templates/advanced/<int:template_id>/preview', methods=['POST'])
+def preview_advanced_template(template_id):
+    """预览格式化后的Timeline"""
+    try:
+        template = VideoTemplate.query.filter_by(id=template_id, is_advanced=True).first()
+        if not template:
+            return jsonify({'success': False, 'message': '模板不存在'}), 404
+
+        data = request.get_json()
+
+        # 使用格式化器
+        from services.timeline_formatter import DefaultTimelineFormatter
+        formatter = DefaultTimelineFormatter()
+        formatted = formatter.format(template.timeline_json, data)
+
+        return jsonify({
+            'success': True,
+            'timeline': formatted
+        })
+
+    except Exception as e:
+        logger.error(f"预览模板失败: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+# ==================== 高级模板管理页面 ====================
+
+@app.route('/advanced_templates')
+def advanced_templates_page():
+    """高级模板管理页面"""
+    return render_template('advanced_templates.html')
 
 
 if __name__ == '__main__':

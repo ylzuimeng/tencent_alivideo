@@ -3,6 +3,67 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
+
+class DoctorInfo(db.Model):
+    """医生信息表"""
+    __tablename__ = 'doctor_info'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)        # 姓名
+    hospital = db.Column(db.String(200))                    # 医院
+    department = db.Column(db.String(100))                  # 科室
+    title = db.Column(db.String(50))                        # 职称
+    batch_id = db.Column(db.String(100))                    # 导入批次号
+    is_validated = db.Column(db.Boolean, default=False)     # 是否已校验
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # 关联关系
+    processing_tasks = db.relationship('ProcessingTask', backref='doctor_info', lazy='dynamic')
+
+    def __repr__(self):
+        return f'<DoctorInfo {self.name} - {self.hospital}>'
+
+
+class VideoTemplate(db.Model):
+    """视频模板表（替换TaskStyle）"""
+    __tablename__ = 'video_template'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)        # 模板名称
+
+    # 视频素材
+    header_video_url = db.Column(db.String(255))           # 片头视频URL
+    footer_video_url = db.Column(db.String(255))           # 片尾视频URL
+
+    # 字幕配置
+    enable_subtitle = db.Column(db.Boolean, default=False)  # 是否生成字幕
+    subtitle_position = db.Column(db.String(50))           # 字幕位置：top/bottom/center
+    subtitle_extract_audio = db.Column(db.Boolean, default=True)  # 是否提取语音
+
+    # 文字叠加配置（JSON格式存储）
+    text_overlay_config = db.Column(db.Text)               # JSON格式的文字叠加配置
+
+    # NEW: 高级模板功能（支持占位符）
+    timeline_json = db.Column(db.Text)                     # 完整Timeline JSON（含占位符）
+    output_media_config = db.Column(db.Text)               # 输出配置JSON
+    editing_produce_config = db.Column(db.Text)            # 制作配置（封面等）JSON
+    formatter_type = db.Column(db.String(50), default='default')  # 格式化器类型
+
+    # NEW: 模板元数据
+    category = db.Column(db.String(100), default='general') # 分类：medical/education/general
+    is_advanced = db.Column(db.Boolean, default=False)      # 是否为高级模板（使用占位符）
+    thumbnail_url = db.Column(db.String(255))               # 缩略图URL
+
+    description = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 关联关系
+    processing_tasks = db.relationship('ProcessingTask', backref='video_template', lazy='dynamic')
+
+    def __repr__(self):
+        return f'<VideoTemplate {self.name}>'
+
 class File(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(100), nullable=False)  # 原始文件名
@@ -45,7 +106,9 @@ class ProcessingTask(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     task_name = db.Column(db.String(200), nullable=False) # 任务名称
     source_file_id = db.Column(db.Integer, db.ForeignKey('file.id'))  # 源视频文件ID
-    task_style_id = db.Column(db.Integer, db.ForeignKey('task_style.id'))  # TaskStyle模板ID
+    task_style_id = db.Column(db.Integer, db.ForeignKey('task_style.id'))  # TaskStyle模板ID（兼容旧版）
+    doctor_info_id = db.Column(db.Integer, db.ForeignKey('doctor_info.id'))  # 医生信息ID
+    video_template_id = db.Column(db.Integer, db.ForeignKey('video_template.id'))  # 视频模板ID
     status = db.Column(db.String(50), default='pending')  # 任务状态：pending/processing/completed/failed
     ice_job_id = db.Column(db.String(255))                # 阿里云ICE作业ID
     ice_project_id = db.Column(db.String(255))            # 阿里云ICE工程ID
@@ -55,6 +118,9 @@ class ProcessingTask(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = db.Column(db.DateTime)                 # 完成时间
+
+    # NEW: 使用高级模板标志
+    use_advanced_timeline = db.Column(db.Boolean, default=False)  # 是否使用高级Timeline（占位符）
 
     # 关联关系
     source_file = db.relationship('File', backref='processing_tasks')
