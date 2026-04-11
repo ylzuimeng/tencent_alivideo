@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    {% block head %}{% endblock %}
 </head>
 <body>
     <div class="container-fluid">
@@ -17,23 +18,33 @@
                 </div>
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('upload') }}">
-                            <i class="fas fa-cloud-upload-alt me-2"></i>上传素材
+                        <a class="nav-link" href="{{ url_for('upload_enhanced') }}">
+                            <i class="fas fa-cloud-upload-alt me-2"></i>视频处理
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('taskstyles') }}">
-                            <i class="fas fa-palette me-2"></i>模板管理
+                        <a class="nav-link" href="{{ url_for('doctors') }}">
+                            <i class="fas fa-user-md me-2"></i>医生信息
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('files') }}">
+                        <a class="nav-link" href="{{ url_for('video_templates') }}">
+                            <i class="fas fa-palette me-2"></i>模板配置
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('files_enhanced') }}">
                             <i class="fas fa-folder me-2"></i>文件管理
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('task_list') }}">
                             <i class="fas fa-tasks me-2"></i>任务列表
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('advanced_templates_page') }}">
+                            <i class="fas fa-layer-group me-2"></i>高级模板
                         </a>
                     </li>
                 </ul>
@@ -45,6 +56,7 @@
         </div>
     </div>
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/ui-utils.js') }}?v=1.0"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
