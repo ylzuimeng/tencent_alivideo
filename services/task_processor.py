@@ -14,6 +14,7 @@ import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from utils.time_helpers import utcnow, serialize_datetime
 from typing import Optional, Dict, List
 
 from flask import current_app
@@ -219,8 +220,20 @@ class TaskProcessor:
             # 使用增强的Timeline生成（支持文字叠加）
             return ice_client.create_timeline_with_overlay(video_template, main_video_url, doctor_info)
 
-        # 3. 兼容旧版：TaskStyle
+        # 3. 兼容旧版：TaskStyle（已弃用）
         elif task.task_style_id:
+            import warnings
+            warnings.warn(
+                "TaskStyle已弃用。建议迁移到VideoTemplate以获得更好的功能和性能。"
+                "迁移指南请参见: docs/MIGRATION_GUIDE.md",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            logger.warning(
+                f"任务 {task.id} 使用已弃用的TaskStyle (ID: {task.task_style_id})。"
+                "建议尽快迁移到VideoTemplate。"
+            )
+
             task_style = TaskStyle.query.get(task.task_style_id)
             if not task_style:
                 raise Exception(f"TaskStyle不存在: {task.task_style_id}")
@@ -251,7 +264,7 @@ class TaskProcessor:
         bucket = os.getenv('OSS_BUCKET_NAME')
         endpoint = os.getenv('OSS_ENDPOINT', 'oss-cn-shanghai.aliyuncs.com')
 
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = utcnow().strftime('%Y%m%d_%H%M%S')
         filename = f"processed_{task.id}_{timestamp}.mp4"
 
         return f'https://{bucket}.{endpoint}/processed_videos/{filename}'
@@ -288,7 +301,7 @@ class TaskProcessor:
                 # 检查是否完成
                 if task.status == 'completed':
                     task.output_oss_url = status_info.get('output_url', '')
-                    task.completed_at = datetime.now()
+                    task.completed_at = utcnow()
                     db.session.commit()
                     logger.info(f"任务完成: {task.task_name}")
                     break
@@ -333,8 +346,8 @@ class TaskProcessor:
             'progress': task.progress,
             'output_oss_url': task.output_oss_url,
             'error_message': task.error_message,
-            'created_at': task.created_at.isoformat(),
-            'completed_at': task.completed_at.isoformat() if task.completed_at else None
+            'created_at': serialize_datetime(task.created_at, to_beijing=True),
+            'completed_at': serialize_datetime(task.completed_at, to_beijing=True) if task.completed_at else None
         }
 
     def get_all_tasks(self, limit: int = 50) -> list:
@@ -369,8 +382,8 @@ class TaskProcessor:
             'progress': task.progress,
             'output_oss_url': task.output_oss_url,
             'error_message': task.error_message,
-            'created_at': task.created_at.isoformat(),
-            'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+            'created_at': serialize_datetime(task.created_at, to_beijing=True),
+            'completed_at': serialize_datetime(task.completed_at, to_beijing=True) if task.completed_at else None,
             # 关联数据已预加载，可直接访问
             'source_file_name': task.source_file.filename if task.source_file else None,
             'template_name': task.video_template.name if task.video_template else

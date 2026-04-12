@@ -326,9 +326,20 @@ function escapeHtml(text) {
 function formatDate(dateString) {
     if (!dateString) return '-';
 
-    // 确保时间字符串有Z后缀（UTC时间标识）
-    const isoString = dateString.endsWith('Z') ? dateString : dateString + 'Z';
-    const date = new Date(isoString);
+    // 如果字符串已经包含时区信息（如 +08:00 或 -05:00），直接使用
+    // 否则假设是 UTC 时间，添加 'Z' 后缀
+    let dateToParse = dateString;
+    if (!dateString.endsWith('Z') && !dateString.includes('+') && !dateString.match(/-\d{2}:\d{2}$/)) {
+        dateToParse = dateString + 'Z';
+    }
+
+    const date = new Date(dateToParse);
+
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+        console.error('Invalid date string:', dateString);
+        return '-';
+    }
 
     // 格式化为北京时间
     return date.toLocaleString('zh-CN', {

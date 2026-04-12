@@ -1,301 +1,18 @@
 {% extends "base.html" %}
 
 {% block head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    min-height: 100vh;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-.page-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 30px 20px;
-}
-
-.header-section {
-    background: white;
-    border-radius: 20px;
-    padding: 30px 40px;
-    margin-bottom: 30px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.header-left {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-.header-icon {
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    color: white;
-    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
-}
-
-.header-title h1 {
-    font-size: 28px;
-    font-weight: 700;
-    color: #2c3e50;
-    margin: 0;
-}
-
-.header-title p {
-    font-size: 14px;
-    color: #6c757d;
-    margin: 5px 0 0 0;
-}
-
-.stats-section {
-    display: flex;
-    gap: 20px;
-}
-
-.stat-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 12px;
-    padding: 15px 25px;
-    color: white;
-    min-width: 140px;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-}
-
-.stat-card.size {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);
-}
-
-.stat-label {
-    font-size: 12px;
-    opacity: 0.9;
-    margin-bottom: 5px;
-}
-
-.stat-value {
-    font-size: 24px;
-    font-weight: 700;
-}
-
-.main-content {
-    background: white;
-    border-radius: 20px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    overflow: hidden;
-}
-
-.table-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 25px 40px;
-}
-
-.table-header h2 {
-    font-size: 20px;
-    font-weight: 600;
-    margin: 0;
-}
-
-.custom-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.custom-table thead {
-    background: #f8f9fa;
-}
-
-.custom-table th {
-    padding: 18px 25px;
-    text-align: left;
-    font-weight: 600;
-    color: #495057;
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 2px solid #e9ecef;
-}
-
-.custom-table td {
-    padding: 20px 25px;
-    vertical-align: middle;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.custom-table tbody tr {
+.file-card {
     transition: all 0.3s ease;
 }
 
-.custom-table tbody tr:hover {
-    background: #f8f9fa;
-    transform: scale(1.01);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+.file-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-.file-name-cell {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.file-icon {
-    width: 45px;
-    height: 45px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 18px;
-    flex-shrink: 0;
-}
-
-.file-name-text {
-    font-weight: 600;
-    color: #2c3e50;
-    font-size: 15px;
-}
-
-.meta-display {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.meta-primary {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: #2c3e50;
-    font-weight: 500;
-}
-
-.meta-primary i {
-    color: #667eea;
-    font-size: 14px;
-}
-
-.meta-secondary {
-    font-size: 12px;
-    color: #6c757d;
-}
-
-.url-display {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.url-link {
-    color: #6c757d;
-    font-size: 13px;
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    max-width: 350px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.url-link:hover {
-    color: #667eea;
-}
-
-.btn-group-custom {
-    display: flex;
-    gap: 8px;
-}
-
-.btn-custom {
-    padding: 8px 16px;
-    border-radius: 10px;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-    border: none;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-}
-
-.btn-preview {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-}
-
-.btn-preview:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-}
-
-.btn-download {
-    background: white;
-    color: #28a745;
-    border: 1px solid #28a745;
-}
-
-.btn-download:hover {
-    background: #28a745;
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
-}
-
-.btn-delete {
-    background: white;
-    color: #dc3545;
-    border: 1px solid #dc3545;
-}
-
-.btn-delete:hover {
-    background: #dc3545;
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(220, 53, 69, 0.3);
-}
-
-/* 视频预览模态框 */
 .video-preview-modal .modal-dialog {
-    max-width: 1000px;
-}
-
-.video-preview-modal .modal-content {
-    border-radius: 20px;
-    border: none;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-}
-
-.video-preview-modal .modal-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 20px 20px 0 0;
-    padding: 20px 30px;
-}
-
-.video-preview-modal .modal-body {
-    padding: 30px;
+    max-width: 900px;
 }
 
 .video-preview-container {
@@ -303,9 +20,8 @@ body {
     padding-bottom: 56.25%;
     height: 0;
     overflow: hidden;
-    border-radius: 16px;
     background: #000;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    border-radius: 8px;
 }
 
 .video-preview-container video {
@@ -315,182 +31,117 @@ body {
     width: 100%;
     height: 100%;
 }
-
-.preview-info {
-    margin-top: 25px;
-    padding: 25px;
-    background: #f8f9fa;
-    border-radius: 16px;
-}
-
-.preview-info h6 {
-    color: #2c3e50;
-    font-weight: 700;
-    margin-bottom: 20px;
-    font-size: 18px;
-}
-
-.preview-meta-row {
-    display: flex;
-    gap: 40px;
-    margin-bottom: 15px;
-}
-
-.preview-meta-item label {
-    display: block;
-    font-size: 12px;
-    color: #6c757d;
-    margin-bottom: 8px;
-    font-weight: 600;
-}
-
-.preview-meta-item span {
-    font-size: 15px;
-    color: #2c3e50;
-    font-weight: 600;
-}
-
-.video-preview-modal .modal-footer {
-    border: none;
-    padding: 20px 30px;
-}
-
-/* 空状态 */
-.empty-state {
-    text-align: center;
-    padding: 100px 20px;
-    background: white;
-    border-radius: 20px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-}
-
-.empty-state i {
-    font-size: 100px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 25px;
-}
-
-.empty-state h4 {
-    color: #2c3e50;
-    font-weight: 700;
-    font-size: 24px;
-    margin-bottom: 15px;
-}
-
-/* 加载动画 */
-.loading-overlay {
-    text-align: center;
-    padding: 80px 20px;
-    background: white;
-    border-radius: 20px;
-}
-
-.spinner-custom {
-    width: 60px;
-    height: 60px;
-    border: 5px solid #f3f3f3;
-    border-top: 5px solid #667eea;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 25px;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* 上传按钮样式 */
-.btn-upload {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    padding: 12px 28px;
-    border-radius: 12px;
-    font-size: 15px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-}
-
-.btn-upload:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
-    color: white;
-}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-container">
-    <!-- 头部区域 -->
-    <div class="header-section">
-        <div class="header-left">
-            <div class="header-icon">
-                <i class="fas fa-video"></i>
-            </div>
-            <div class="header-title">
-                <h1>视频文件管理</h1>
-                <p>管理和预览您的视频素材库</p>
-            </div>
-        </div>
-        <div class="stats-section">
-            <div class="stat-card">
-                <div class="stat-label">视频总数</div>
-                <div class="stat-value" id="videoCount">0</div>
-            </div>
-            <div class="stat-card size">
-                <div class="stat-label">总大小</div>
-                <div class="stat-value" id="totalSize">0 MB</div>
+<div class="container-fluid mt-4">
+    <!-- 顶部操作栏 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-1">
+                            <i class="fas fa-video me-2"></i>视频文件管理
+                        </h3>
+                        <p class="text-muted mb-0 small">
+                            管理和预览您的视频素材库
+                        </p>
+                    </div>
+                    <div>
+                        <button onclick="loadFiles()" class="btn btn-outline-primary me-2">
+                            <i class="fas fa-sync-alt me-1"></i>刷新
+                        </button>
+                        <button onclick="location.href='/upload/enhanced'" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>上传新视频
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- 主内容区域 -->
-    <div class="main-content">
-        <!-- 表格头部 -->
-        <div class="table-header">
-            <div class="d-flex justify-content-between align-items-center">
-                <h2><i class="fas fa-list me-2"></i>文件列表</h2>
-                <button onclick="location.href='/upload/enhanced'" class="btn btn-upload">
-                    <i class="fas fa-plus me-2"></i>上传新视频
-                </button>
+    <!-- 统计信息 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            <i class="fas fa-film fa-2x text-primary"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0 text-muted">视频总数</h6>
+                            <h3 class="mb-0" id="videoCount">0</h3>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-
-        <!-- 加载状态 -->
-        <div id="loadingState" class="loading-overlay">
-            <div class="spinner-custom"></div>
-            <p style="color: #6c757d; margin-top: 20px;">正在加载视频文件...</p>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            <i class="fas fa-database fa-2x text-success"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0 text-muted">总大小</h6>
+                            <h3 class="mb-0" id="totalSize">0 MB</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+    </div>
 
-        <!-- 文件表格 -->
-        <table class="custom-table" id="filesTable" style="display: none;">
-            <thead>
-                <tr>
-                    <th style="width: 30%;">文件名</th>
-                    <th style="width: 15%;">大小</th>
-                    <th style="width: 15%;">上传时间</th>
-                    <th style="width: 25%;">文件地址</th>
-                    <th style="width: 15%;" class="text-center">操作</th>
-                </tr>
-            </thead>
-            <tbody id="filesTableBody">
-                <!-- 文件行将通过JavaScript动态生成 -->
-            </tbody>
-        </table>
+    <!-- 文件列表 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>文件列表
+                    </h5>
+                </div>
 
-        <!-- 空状态 -->
-        <div id="emptyState" class="empty-state" style="display: none;">
-            <i class="fas fa-video-slash"></i>
-            <h4>暂无视频文件</h4>
-            <p style="color: #6c757d; margin-bottom: 30px;">开始上传您的第一个视频文件吧</p>
-            <button onclick="location.href='/upload/enhanced'" class="btn btn-upload">
-                <i class="fas fa-upload me-2"></i>立即上传
-            </button>
+                <!-- 加载状态 -->
+                <div id="loadingState" class="card-body text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <p class="text-muted mt-3">正在加载视频文件...</p>
+                </div>
+
+                <!-- 文件表格 -->
+                <div class="table-responsive" id="filesTable" style="display: none;">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>文件名</th>
+                                <th>大小</th>
+                                <th>上传时间</th>
+                                <th>文件地址</th>
+                                <th class="text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="filesTableBody">
+                            <!-- 文件行将通过JavaScript动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 空状态 -->
+                <div id="emptyState" class="card-body text-center py-5" style="display: none;">
+                    <i class="fas fa-video-slash fa-3x text-muted mb-3"></i>
+                    <h5>暂无视频文件</h5>
+                    <p class="text-muted">开始上传您的第一个视频文件吧</p>
+                    <button onclick="location.href='/upload/enhanced'" class="btn btn-primary">
+                        <i class="fas fa-upload me-2"></i>立即上传
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -503,7 +154,7 @@ body {
                 <h5 class="modal-title">
                     <i class="fas fa-play-circle me-2"></i>视频预览
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="video-preview-container">
@@ -512,25 +163,23 @@ body {
                         您的浏览器不支持视频播放。
                     </video>
                 </div>
-                <div class="preview-info">
+                <div class="mt-3">
                     <h6 id="previewFileName">文件名</h6>
-                    <div class="preview-meta-row">
-                        <div class="preview-meta-item">
-                            <label>📦 文件大小</label>
-                            <span id="previewFileSize">-</span>
+                    <div class="row mt-2">
+                        <div class="col-md-6">
+                            <small class="text-muted">文件大小</small>
+                            <div id="previewFileSize">-</div>
                         </div>
-                        <div class="preview-meta-item">
-                            <label>🕐 上传时间</label>
-                            <span id="previewUploadTime">-</span>
+                        <div class="col-md-6">
+                            <small class="text-muted">上传时间</small>
+                            <div id="previewUploadTime">-</div>
                         </div>
                     </div>
-                    <div style="margin-top: 20px;">
-                        <label style="font-size: 12px; color: #6c757d; font-weight: 600;">🔗 文件地址</label>
-                        <div class="input-group input-group-sm mt-2">
-                            <input type="text" class="form-control" id="previewFileUrl" readonly
-                                   style="border-radius: 8px 0 0 8px;">
-                            <button class="btn btn-outline-secondary" onclick="copyFileUrl()"
-                                    style="border-radius: 0 8px 8px 0;">
+                    <div class="mt-3">
+                        <small class="text-muted">文件地址</small>
+                        <div class="input-group input-group-sm mt-1">
+                            <input type="text" class="form-control" id="previewFileUrl" readonly>
+                            <button class="btn btn-outline-secondary" onclick="copyFileUrl()">
                                 <i class="fas fa-copy me-1"></i>复制链接
                             </button>
                         </div>
@@ -538,12 +187,10 @@ body {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal"
-                        style="border-radius: 8px; padding: 10px 25px;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                     <i class="fas fa-times me-2"></i>关闭
                 </button>
-                <a id="previewDownloadLink" href="#" target="_blank" class="btn btn-success"
-                   style="border-radius: 8px; padding: 10px 25px; background: #28a745; color: white; border: none;">
+                <a id="previewDownloadLink" href="#" target="_blank" class="btn btn-success">
                     <i class="fas fa-download me-2"></i>下载文件
                 </a>
             </div>
@@ -558,86 +205,40 @@ let allFiles = [];
 
 // 页面加载时获取文件列表
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('=== DOM ContentLoaded ===');
-    console.log('DOM loaded, starting to load files...');
-
-    // 检查依赖是否加载
-    if (typeof Toast === 'undefined') {
-        console.error('Toast 未定义！ui-utils.js 可能未加载');
-        alert('错误：UI工具库未加载，请刷新页面');
-    }
-    if (typeof Loading === 'undefined') {
-        console.error('Loading 未定义！ui-utils.js 可能未加载');
-    }
-    if (typeof ConfirmDialog === 'undefined') {
-        console.error('ConfirmDialog 未定义！ui-utils.js 可能未加载');
-    }
-
-    console.log('所有依赖已加载，开始获取文件...');
     loadFiles();
 });
 
 // 加载文件列表
 async function loadFiles() {
-    console.log('=== loadFiles() called ===');
-
     try {
-        console.log('1. 开始请求 /api/files...');
         const response = await fetch('/api/files');
-        console.log('2. 收到响应，状态码:', response.status);
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const result = await response.json();
-        console.log('3. JSON解析完成:', result);
-        console.log('   - success:', result.success);
-        console.log('   - files count:', result.files ? result.files.length : 0);
 
-        // Hide loading state
-        const loadingState = document.getElementById('loadingState');
-        if (loadingState) {
-            loadingState.style.display = 'none';
-            console.log('4. 隐藏加载状态');
-        }
+        // 隐藏加载状态
+        document.getElementById('loadingState').style.display = 'none';
 
         if (result.success && result.files && result.files.length > 0) {
-            console.log('5. 找到', result.files.length, '个文件，开始渲染...');
             allFiles = result.files;
             renderFiles(result.files);
             updateStats(result.files);
-            document.getElementById('filesTable').style.display = 'table';
+            document.getElementById('filesTable').style.display = 'block';
             document.getElementById('emptyState').style.display = 'none';
-            console.log('✅ 文件加载成功！已显示', result.files.length, '个文件');
         } else {
-            console.log('5. 没有找到文件');
             updateStats([]);
             document.getElementById('filesTable').style.display = 'none';
             document.getElementById('emptyState').style.display = 'block';
-            console.log('✅ 显示空状态');
         }
     } catch (error) {
-        console.error('❌ 加载文件列表失败:', error);
-        console.error('   错误堆栈:', error.stack);
+        console.error('加载文件列表失败:', error);
+        alert('加载失败: ' + error.message);
 
-        // 安全地显示错误
-        try {
-            if (typeof Toast !== 'undefined') {
-                Toast.error('加载文件列表失败: ' + error.message);
-            } else {
-                alert('加载失败: ' + error.message);
-            }
-        } catch (e) {
-            console.error('显示错误消息失败:', e);
-        }
-
-        // Hide loading state
-        const loadingState = document.getElementById('loadingState');
-        if (loadingState) {
-            loadingState.style.display = 'none';
-        }
-
+        // 隐藏加载状态
+        document.getElementById('loadingState').style.display = 'none';
         document.getElementById('filesTable').style.display = 'none';
         document.getElementById('emptyState').style.display = 'block';
         updateStats([]);
@@ -646,94 +247,48 @@ async function loadFiles() {
 
 // 更新统计信息
 function updateStats(files) {
-    console.log('更新统计信息，文件数:', files.length);
-    const videoCount = document.getElementById('videoCount');
-    const totalSize = document.getElementById('totalSize');
-
-    if (videoCount) {
-        videoCount.textContent = files.length;
-    }
+    document.getElementById('videoCount').textContent = files.length;
 
     const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
     const totalSizeStr = formatFileSize(totalBytes);
-
-    if (totalSize) {
-        totalSize.textContent = totalSizeStr;
-    }
-
-    console.log('   - 文件总数:', files.length);
-    console.log('   - 总大小:', totalSizeStr);
+    document.getElementById('totalSize').textContent = totalSizeStr;
 }
 
 // 渲染文件列表
 function renderFiles(files) {
-    console.log('=== renderFiles() 开始渲染 ===');
-    console.log('要渲染的文件数:', files.length);
-
     const tbody = document.getElementById('filesTableBody');
-    if (!tbody) {
-        console.error('❌ 找不到 filesTableBody 元素！');
-        return;
-    }
-
-    console.log('清空表格body...');
     tbody.innerHTML = '';
 
-    files.forEach((file, index) => {
-        console.log(`渲染第 ${index + 1} 个文件:`, file.filename);
-
+    files.forEach((file) => {
         const row = document.createElement('tr');
-        row.style.animation = `fadeInUp 0.5s ease forwards ${index * 0.1}s`;
-        row.style.opacity = '0';
-
         row.innerHTML = `
             <td>
-                <div class="file-name-cell">
-                    <div class="file-icon">
+                <i class="fas fa-file-video text-primary me-2"></i>
+                <span class="fw-medium">${escapeHtml(file.filename)}</span>
+            </td>
+            <td>
+                <i class="fas fa-database text-muted me-1"></i>
+                ${formatFileSize(file.size)}
+            </td>
+            <td>
+                <div>${formatDate(file.upload_time)}</div>
+                <small class="text-muted">${formatTimeAgo(file.upload_time)}</small>
+            </td>
+            <td>
+                <a href="${file.oss_url}" target="_blank" class="text-decoration-none text-truncate d-inline-block" style="max-width: 300px;" title="${file.oss_url}">
+                    <i class="fas fa-link text-muted me-1"></i>
+                    <span class="text-muted">${file.oss_url}</span>
+                </a>
+            </td>
+            <td class="text-center">
+                <div class="btn-group btn-group-sm" role="group">
+                    <button class="btn btn-outline-primary" onclick="previewVideo('${file.oss_url}', '${escapeHtml(file.filename)}', ${file.size}, '${file.upload_time}')" title="预览">
                         <i class="fas fa-play"></i>
-                    </div>
-                    <div>
-                        <div class="file-name-text">${escapeHtml(file.filename)}</div>
-                    </div>
-                </div>
-            </td>
-            <td>
-                <div class="meta-display">
-                    <div class="meta-primary">
-                        <i class="fas fa-database"></i>
-                        <span>${formatFileSize(file.size)}</span>
-                    </div>
-                </div>
-            </td>
-            <td>
-                <div class="meta-display">
-                    <div class="meta-primary">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span>${formatDate(file.upload_time)}</span>
-                    </div>
-                    <div class="meta-secondary">
-                        ${formatTimeAgo(file.upload_time)}
-                    </div>
-                </div>
-            </td>
-            <td>
-                <div class="url-display">
-                    <a href="${file.oss_url}" target="_blank" class="url-link" title="${file.oss_url}">
-                        <i class="fas fa-link"></i>
-                        <span>${file.oss_url}</span>
-                    </a>
-                </div>
-            </td>
-            <td>
-                <div class="btn-group-custom">
-                    <button class="btn-custom btn-preview" onclick="previewVideo('${file.oss_url}', '${file.filename}', ${file.size}, '${file.upload_time}')">
-                        <i class="fas fa-play"></i>
-                        <span>预览</span>
                     </button>
-                    <button class="btn-custom btn-download" onclick="downloadVideo('${file.oss_url}')">
+                    <button class="btn btn-outline-success" onclick="downloadVideo('${file.oss_url}')" title="下载">
                         <i class="fas fa-download"></i>
                     </button>
-                    <button class="btn-custom btn-delete" onclick="deleteFile(${file.id}, '${file.filename}')">
+                    <button class="btn btn-outline-danger" onclick="deleteFile(${file.id}, '${escapeHtml(file.filename)}')" title="删除">
                         <i class="fas fa-trash-alt"></i>
                     </button>
                 </div>
@@ -741,8 +296,6 @@ function renderFiles(files) {
         `;
         tbody.appendChild(row);
     });
-
-    console.log('✅ 渲染完成，表格body包含', tbody.children.length, '行');
 }
 
 // 预览视频
@@ -780,39 +333,32 @@ function downloadVideo(url) {
 
 // 删除文件
 function deleteFile(fileId, filename) {
-    ConfirmDialog.show(
-        `确定要删除视频 "${escapeHtml(filename)}" 吗？`,
-        '确认删除',
-        async () => {
-            try {
-                const loading = Loading.show('正在删除文件...');
-                const response = await fetch(`/api/delete/${fileId}`, {
-                    method: 'POST'
-                });
-                Loading.hide(loading);
-
-                if (response.ok) {
-                    Toast.success('✅ 文件删除成功');
-                    loadFiles();
-                } else {
-                    const error = await response.json();
-                    Toast.error(error.error || '删除失败');
-                }
-            } catch (error) {
-                Loading.hide(loading);
-                Toast.error('删除失败：' + error.message);
+    if (confirm(`确定要删除视频 "${filename}" 吗？`)) {
+        fetch(`/api/delete/${fileId}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success || response.ok) {
+                alert('文件删除成功');
+                loadFiles();
+            } else {
+                alert(result.error || '删除失败');
             }
-        }
-    );
+        })
+        .catch(error => {
+            alert('删除失败：' + error.message);
+        });
+    }
 }
 
 // 复制文件URL
 function copyFileUrl() {
     const url = document.getElementById('previewFileUrl').value;
     navigator.clipboard.writeText(url).then(() => {
-        Toast.success('✅ URL已复制到剪贴板');
+        alert('URL已复制到剪贴板');
     }).catch(() => {
-        Toast.error('复制失败，请手动复制');
+        alert('复制失败，请手动复制');
     });
 }
 
@@ -827,10 +373,22 @@ function formatFileSize(bytes) {
 
 function formatDate(dateString) {
     if (!dateString) return '-';
-    // 数据库存储的是UTC时间，需要添加 'Z' 后缀明确标识
-    const utcDateString = dateString.endsWith('Z') ? dateString : dateString + 'Z';
-    const date = new Date(utcDateString);
-    // 使用北京时间（Asia/Shanghai 时区，UTC+8）
+
+    // 如果字符串已经包含时区信息（如 +08:00 或 -05:00），直接使用
+    // 否则假设是 UTC 时间，添加 'Z' 后缀
+    let dateToParse = dateString;
+    if (!dateString.endsWith('Z') && !dateString.includes('+') && !dateString.match(/-\d{2}:\d{2}$/)) {
+        dateToParse = dateString + 'Z';
+    }
+
+    const date = new Date(dateToParse);
+
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+        console.error('Invalid date string:', dateString);
+        return '-';
+    }
+
     return date.toLocaleString('zh-CN', {
         timeZone: 'Asia/Shanghai',
         year: 'numeric',
@@ -838,25 +396,36 @@ function formatDate(dateString) {
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit',
         hour12: false
     });
 }
 
 function formatTimeAgo(dateString) {
     if (!dateString) return '';
-    // 数据库存储的是UTC时间，需要添加 'Z' 后缀明确标识
-    const utcDateString = dateString.endsWith('Z') ? dateString : dateString + 'Z';
-    const date = new Date(utcDateString);
+
+    // 如果字符串已经包含时区信息（如 +08:00 或 -05:00），直接使用
+    // 否则假设是 UTC 时间，添加 'Z' 后缀
+    let dateToParse = dateString;
+    if (!dateString.endsWith('Z') && !dateString.includes('+') && !dateString.match(/-\d{2}:\d{2}$/)) {
+        dateToParse = dateString + 'Z';
+    }
+
+    const date = new Date(dateToParse);
+
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+        console.error('Invalid date string:', dateString);
+        return '-';
+    }
+
     const now = new Date();
-    const diff = Math.floor((now - date) / 1000); // 秒
+    const diff = Math.floor((now - date) / 1000);
 
     if (diff < 60) return '刚刚';
     if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
     if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
     if (diff < 604800) return Math.floor(diff / 86400) + ' 天前';
 
-    // 对于超过7天的日期，显示北京时区的日期
     return date.toLocaleDateString('zh-CN', {
         timeZone: 'Asia/Shanghai',
         year: 'numeric',
@@ -870,21 +439,5 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
-
-// 添加CSS动画
-const fadeInUpStyle = document.createElement('style');
-fadeInUpStyle.textContent = `
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-`;
-document.head.appendChild(fadeInUpStyle);
 </script>
 {% endblock %}

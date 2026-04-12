@@ -4,6 +4,7 @@ from models import db, File, Template, TaskStyle, ProcessingTask, DoctorInfo, Vi
 import os
 import logging
 from datetime import datetime
+from utils.time_helpers import utcnow, serialize_datetime
 from dotenv import load_dotenv
 import alibabacloud_oss_v2 as oss
 from config import Config
@@ -117,7 +118,7 @@ class FileHandler:
     @staticmethod
     def generate_oss_path(filename):
         safe_filename = secure_filename(filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = utcnow().strftime('%Y%m%d_%H%M%S')
         return f'uploads/{timestamp}_{safe_filename}'
 
 # 模版处理类
@@ -130,7 +131,7 @@ class TemplateHandler:
     @staticmethod
     def generate_oss_path(filename):
         safe_filename = secure_filename(filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = utcnow().strftime('%Y%m%d_%H%M%S')
         return f'templates/{timestamp}_{safe_filename}'
 
 # 启动时验证配置
@@ -209,7 +210,7 @@ def get_files_api():
                     'filename': f.filename,
                     'oss_url': f.oss_url,
                     'size': f.size,
-                    'upload_time': f.upload_time.isoformat()
+                    'upload_time': serialize_datetime(f.upload_time, to_beijing=True)
                 }
                 for f in files
             ]
@@ -266,7 +267,7 @@ def get_templates():
         'id': t.id,
         'filename': t.filename,
         'oss_url': t.oss_url,
-        'upload_time': t.upload_time.isoformat()
+        'upload_time': serialize_datetime(t.upload_time, to_beijing=True)
     } for t in templates])
 
 # 文件上传处理
@@ -321,7 +322,7 @@ def upload_file():
                     'file_id': new_file.id,
                     'file_url': file_url,
                     'filename': file.filename,
-                    'task_id': datetime.now().isoformat()
+                    'task_id': utcnow().isoformat()
                 })
             except Exception as db_error:
                 db.session.rollback()
@@ -392,7 +393,7 @@ def upload_template():
                     'file_id': new_file.id,
                     'file_url': file_url,
                     'filename': file.filename,
-                    'task_id': datetime.now().isoformat()
+                    'task_id': utcnow().isoformat()
                 })
             except Exception as db_error:
                 db.session.rollback()
@@ -532,7 +533,7 @@ def get_taskstyles_api():
                 'title_picture_oss_url_2': ts.title_picture_oss_url_2,
                 'change_material_oss_url': ts.change_material_oss_url,
                 'description': ts.description,
-                'created_at': ts.created_at.isoformat()
+                'created_at': serialize_datetime(ts.created_at, to_beijing=True)
             })
 
         logger.info(f"返回TaskStyle列表，共{len(result)}个模板")
@@ -863,7 +864,7 @@ def get_doctors():
                     'title': d.title,
                     'batch_id': d.batch_id,
                     'is_validated': d.is_validated,
-                    'created_at': d.created_at.isoformat()
+                    'created_at': serialize_datetime(d.created_at, to_beijing=True)
                 }
                 for d in doctors
             ],
@@ -1043,7 +1044,7 @@ def get_video_templates():
                     'is_advanced': t.is_advanced,  # 新增：标识高级模板
                     'category': t.category,  # 新增：模板分类
                     'description': t.description,
-                    'created_at': t.created_at.isoformat()
+                    'created_at': serialize_datetime(t.created_at, to_beijing=True)
                 }
                 for t in templates
             ]
@@ -1144,83 +1145,6 @@ def delete_video_template(template_id):
         return jsonify({'success': False, 'message': f'删除失败: {str(e)}'}), 500
 
 
-# ==================== 模式转换API ====================
-
-@app.route('/api/video_templates/convert-demo', methods=['POST'])
-def convert_template_demo():
-    """模式转换演示API（不保存，仅返回结果）"""
-    try:
-        from services.template_converter import TemplateConverter
-
-        data = request.get_json()
-        mode = data.get('mode')
-
-        if mode == 'simple-to-advanced':
-            # 简单模式 → 高级模式
-            simple_data = data.get('data', {})
-
-            # 创建临时模板对象
-            temp_template = VideoTemplate(
-                name=simple_data.get('name', '临时模板'),
-                header_video_url=simple_data.get('header_video_url'),
-                footer_video_url=simple_data.get('footer_video_url'),
-                enable_subtitle=simple_data.get('enable_subtitle', False),
-                subtitle_position=simple_data.get('subtitle_position', 'bottom'),
-                subtitle_extract_audio=simple_data.get('subtitle_extract_audio', True),
-                text_overlay_config=simple_data.get('text_overlay_config')
-            )
-
-            result = TemplateConverter.simple_to_advanced(temp_template)
-            return jsonify({'success': True, **result})
-
-        elif mode == 'advanced-to-simple':
-            # 高级模式 → 简单模式
-            timeline_json = data.get('timeline_json')
-
-            if not timeline_json:
-                return jsonify({'success': False, 'message': 'Timeline JSON不能为空'}), 400
-
-            # 创建临时模板对象
-            temp_template = VideoTemplate(
-                name='临时模板',
-                timeline_json=timeline_json,
-                is_advanced=True
-            )
-
-            result = TemplateConverter.advanced_to_simple(temp_template)
-            return jsonify({'success': True, 'data': result})
-
-        else:
-            return jsonify({'success': False, 'message': f'无效的转换模式: {mode}'}), 400
-
-    except Exception as e:
-        logger.error(f"模式转换失败: {str(e)}")
-        return jsonify({'success': False, 'message': f'转换失败: {str(e)}'}), 500
-
-
-@app.route('/api/video_templates/validate-timeline', methods=['POST'])
-def validate_timeline_json():
-    """验证Timeline JSON格式（使用结构化JSON Schema验证）"""
-    try:
-        data = request.get_json()
-        timeline_json = data.get('timeline_json', '')
-
-        # 使用新的JSON验证器
-        from services.json_validator import validate_timeline_json as validate
-
-        is_valid, error_msg = validate(timeline_json)
-
-        return jsonify({
-            'success': is_valid,
-            'valid': is_valid,
-            'message': error_msg if error_msg else 'Timeline JSON格式正确'
-        })
-
-    except Exception as e:
-        logger.error(f"验证Timeline失败: {str(e)}")
-        return jsonify({'success': False, 'valid': False, 'message': str(e)}), 500
-
-
 # ==================== 统一模板管理页面 ====================
 
 @app.route('/templates/unified')
@@ -1229,238 +1153,13 @@ def unified_templates_page():
     return render_template('unified_templates.html')
 
 
-# ==================== 高级Timeline模板API（支持占位符）====================
+# ==================== Jinja2 过滤器 ====================
 
-@app.route('/api/video_templates/advanced', methods=['POST'])
-def create_advanced_template():
-    """创建高级VideoTemplate（支持占位符，完整JSON验证）"""
-    try:
-        data = request.get_json()
-
-        # 验证必填字段
-        if 'name' not in data or 'timeline_json' not in data:
-            return jsonify({'success': False, 'message': '缺少必填字段: name, timeline_json'}), 400
-
-        # 使用新的JSON验证器进行结构化验证
-        from services.json_validator import validate_timeline_json, validate_output_media_config, validate_editing_produce_config
-
-        # 验证timeline_json
-        is_valid, error_msg = validate_timeline_json(data['timeline_json'])
-        if not is_valid:
-            return jsonify({
-                'success': False,
-                'message': f'Timeline验证失败: {error_msg}'
-            }), 400
-
-        # 验证output_media_config（如果提供）
-        if data.get('output_media_config'):
-            is_valid, error_msg = validate_output_media_config(data['output_media_config'])
-            if not is_valid:
-                return jsonify({
-                    'success': False,
-                    'message': f'输出配置验证失败: {error_msg}'
-                }), 400
-
-        # 验证editing_produce_config（如果提供）
-        if data.get('editing_produce_config'):
-            is_valid, error_msg = validate_editing_produce_config(data['editing_produce_config'])
-            if not is_valid:
-                return jsonify({
-                    'success': False,
-                    'message': f'制作配置验证失败: {error_msg}'
-                }), 400
-
-        # 创建模板
-        template = VideoTemplate(
-            name=data['name'],
-            timeline_json=data['timeline_json'],
-            output_media_config=data.get('output_media_config'),
-            editing_produce_config=data.get('editing_produce_config'),
-            formatter_type=data.get('formatter_type', 'default'),
-            category=data.get('category', 'medical'),
-            is_advanced=True,
-            thumbnail_url=data.get('thumbnail_url'),
-            description=data.get('description', '')
-        )
-
-        db.session.add(template)
-        db.session.commit()
-
-        return jsonify({
-            'success': True,
-            'message': '高级模板创建成功',
-            'template_id': template.id
-        })
-
-    except Exception as e:
-        logger.error(f"创建高级模板失败: {str(e)}")
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
-@app.route('/api/video_templates/advanced', methods=['GET'])
-def get_advanced_templates():
-    """获取高级VideoTemplate列表"""
-    try:
-        category = request.args.get('category')
-        query = VideoTemplate.query.filter_by(is_advanced=True)
-
-        if category:
-            query = query.filter_by(category=category)
-
-        templates = query.order_by(VideoTemplate.created_at.desc()).all()
-
-        return jsonify({
-            'success': True,
-            'templates': [
-                {
-                    'id': t.id,
-                    'name': t.name,
-                    'description': t.description,
-                    'category': t.category,
-                    'formatter_type': t.formatter_type,
-                    'thumbnail_url': t.thumbnail_url,
-                    'is_advanced': t.is_advanced,
-                    'created_at': t.created_at.isoformat()
-                }
-                for t in templates
-            ]
-        })
-
-    except Exception as e:
-        logger.error(f"获取高级模板列表失败: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
-@app.route('/api/video_templates/advanced/<int:template_id>', methods=['GET'])
-def get_advanced_template(template_id):
-    """获取高级模板详情"""
-    try:
-        template = VideoTemplate.query.filter_by(id=template_id, is_advanced=True).first()
-        if not template:
-            return jsonify({'success': False, 'message': '模板不存在'}), 404
-
-        return jsonify({
-            'success': True,
-            'template': {
-                'id': template.id,
-                'name': template.name,
-                'description': template.description,
-                'timeline_json': template.timeline_json,
-                'output_media_config': template.output_media_config,
-                'editing_produce_config': template.editing_produce_config,
-                'formatter_type': template.formatter_type,
-                'category': template.category,
-                'thumbnail_url': template.thumbnail_url,
-                'is_advanced': template.is_advanced,
-                'created_at': template.created_at.isoformat()
-            }
-        })
-
-    except Exception as e:
-        logger.error(f"获取模板详情失败: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
-@app.route('/api/video_templates/advanced/<int:template_id>', methods=['PUT'])
-def update_advanced_template(template_id):
-    """更新高级模板"""
-    try:
-        template = VideoTemplate.query.filter_by(id=template_id, is_advanced=True).first()
-        if not template:
-            return jsonify({'success': False, 'message': '模板不存在'}), 404
-
-        data = request.get_json()
-
-        # 更新字段
-        if 'name' in data:
-            template.name = data['name']
-        if 'description' in data:
-            template.description = data['description']
-        if 'timeline_json' in data:
-            # 验证JSON格式
-            try:
-                json.loads(data['timeline_json'])
-                template.timeline_json = data['timeline_json']
-            except json.JSONDecodeError:
-                return jsonify({'success': False, 'message': 'timeline_json 格式错误'}), 400
-        if 'output_media_config' in data:
-            template.output_media_config = data['output_media_config']
-        if 'editing_produce_config' in data:
-            template.editing_produce_config = data['editing_produce_config']
-        if 'formatter_type' in data:
-            template.formatter_type = data['formatter_type']
-        if 'category' in data:
-            template.category = data['category']
-        if 'thumbnail_url' in data:
-            template.thumbnail_url = data['thumbnail_url']
-
-        template.updated_at = datetime.utcnow()
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': '更新成功'})
-
-    except Exception as e:
-        logger.error(f"更新模板失败: {str(e)}")
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
-@app.route('/api/video_templates/advanced/<int:template_id>', methods=['DELETE'])
-def delete_advanced_template(template_id):
-    """删除高级模板"""
-    try:
-        template = VideoTemplate.query.filter_by(id=template_id, is_advanced=True).first()
-        if not template:
-            return jsonify({'success': False, 'message': '模板不存在'}), 404
-
-        # 检查是否有关联的处理任务
-        if template.processing_tasks.count() > 0:
-            return jsonify({'success': False, 'message': '该模板已关联处理任务，无法删除'}), 400
-
-        db.session.delete(template)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': '删除成功'})
-
-    except Exception as e:
-        logger.error(f"删除模板失败: {str(e)}")
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
-@app.route('/api/video_templates/advanced/<int:template_id>/preview', methods=['POST'])
-def preview_advanced_template(template_id):
-    """预览格式化后的Timeline"""
-    try:
-        template = VideoTemplate.query.filter_by(id=template_id, is_advanced=True).first()
-        if not template:
-            return jsonify({'success': False, 'message': '模板不存在'}), 404
-
-        data = request.get_json()
-
-        # 使用格式化器
-        from services.timeline_formatter import DefaultTimelineFormatter
-        formatter = DefaultTimelineFormatter()
-        formatted = formatter.format(template.timeline_json, data)
-
-        return jsonify({
-            'success': True,
-            'timeline': formatted
-        })
-
-    except Exception as e:
-        logger.error(f"预览模板失败: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
-# ==================== 高级模板管理页面 ====================
-
-@app.route('/advanced_templates')
-def advanced_templates_page():
-    """高级模板管理页面 - 重定向到统一界面"""
-    return redirect('/templates/unified')
-    return render_template('advanced_templates.html')
+@app.template_filter('beijing_time')
+def beijing_time_filter(dt):
+    """Jinja2过滤器：将UTC时间转换为北京时间字符串"""
+    from utils.time_helpers import format_datetime_beijing
+    return format_datetime_beijing(dt, '%Y-%m-%d %H:%M')
 
 
 if __name__ == '__main__':

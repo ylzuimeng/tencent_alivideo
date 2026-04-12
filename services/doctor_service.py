@@ -10,6 +10,7 @@
 import os
 import logging
 from datetime import datetime
+from utils.time_helpers import utcnow
 from typing import Dict, Optional, Tuple
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
@@ -35,7 +36,7 @@ class DoctorService:
     @staticmethod
     def generate_batch_id() -> str:
         """生成批次号"""
-        return datetime.now().strftime('%Y%m%d_%H%M%S')
+        return utcnow().strftime('%Y%m%d_%H%M%S')
 
     @staticmethod
     def import_from_excel(file_path: str, batch_id: Optional[str] = None) -> Tuple[bool, str, list]:

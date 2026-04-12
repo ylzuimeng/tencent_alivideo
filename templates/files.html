@@ -26,7 +26,7 @@
                                 {{ file.filename }}
                             </td>
                             <td>{{ (file.size / (1024*1024))|round(2) }}</td>
-                            <td>{{ file.upload_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ file.upload_time|beijing_time }}</td>
                             <td>
                                 <a href="{{ file.oss_url }}" target="_blank" class="text-truncate d-inline-block" style="max-width: 200px;" title="{{ file.oss_url }}">
                                     {{ file.oss_url }}

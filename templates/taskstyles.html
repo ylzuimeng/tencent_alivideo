@@ -171,7 +171,7 @@
                                 <span class="text-muted">未设置</span>
                                 {% endif %}
                             </td>
-                            <td>{{ style.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ style.created_at|beijing_time }}</td>
                             <td class="text-center">
                                 <form method="post" action="/api/delete_taskstyle/{{ style.id }}" class="d-inline">
                                     <button type="submit" class="btn btn-danger btn-sm"
@@ -213,7 +213,7 @@
                                 {{ file.filename }}
                             </td>
                             <td>{{ (file.size / (1024*1024))|round(2) }}</td>
-                            <td>{{ file.upload_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ file.upload_time|beijing_time }}</td>
                             <td>
                                 <a href="{{ file.oss_url }}" target="_blank" class="text-truncate d-inline-block" style="max-width: 200px;" title="{{ file.oss_url }}">
                                     {{ file.oss_url }}

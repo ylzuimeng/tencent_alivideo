@@ -8,6 +8,7 @@ import os
 import logging
 from typing import Dict, Optional, Any, List
 from datetime import datetime
+from utils.time_helpers import utcnow
 
 from alibabacloud_ice20201109.client import Client as ICE20201109Client
 from alibabacloud_ice20201109 import models as ice20201109_models
@@ -348,7 +349,7 @@ class ICEClient:
         try:
             # 创建剪辑工程请求
             request = ice20201109_models.CreateEditingProjectRequest()
-            request.title = f"VideoProcessing_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            request.title = f"VideoProcessing_{utcnow().strftime('%Y%m%d%H%M%S')}"
             request.description = "自动生成的视频处理工程"
             request.timeline = timeline
 
