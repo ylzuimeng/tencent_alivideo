@@ -304,3 +304,96 @@
     padding: 0.25rem 0;
     font-size: 0.875rem;
 }
+
+/* ========== 标签页规范 - 增强对比度 ========== */
+.nav-tabs {
+    border-bottom: 2px solid #0d6efd;
+}
+
+.nav-tabs .nav-link {
+    border: 1px solid #dee2e6;
+    border-bottom-color: #0d6efd;
+    border-radius: 6px 6px 0 0;
+    color: #495057;
+    background-color: #f8f9fa;
+    font-weight: 500;
+    padding: 0.75rem 1.25rem;
+    margin-right: 0.25rem;
+    transition: all 0.2s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    color: #0d6efd;
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+    isolation: isolate;
+}
+
+.nav-tabs .nav-link.active {
+    color: #0d6efd;
+    background-color: #fff;
+    border-color: #0d6efd #0d6efd #fff;
+    border-bottom-color: #fff;
+    font-weight: 600;
+    box-shadow: 0 -2px 4px rgba(13, 110, 253, 0.1);
+}
+
+/* 为简单模式和高级模式的标签页添加特殊样式 */
+#modeTabs .nav-link {
+    min-width: 120px;
+    text-align: center;
+}
+
+#modeTabs .nav-link i {
+    margin-right: 0.5rem;
+}
+
+/* 确保未激活标签页有足够的对比度 */
+#modeTabs .nav-link:not(.active) {
+    color: #6c757d;
+    background-color: #e9ecef;
+    border-color: #ced4da;
+}
+
+#modeTabs .nav-link:not(.active):hover {
+    color: #0d6efd;
+    background-color: #dee2e6;
+    border-color: #adb5bd;
+}
+
+/* 激活标签页的强调样式 */
+#modeTabs .nav-link.active {
+    color: #0d6efd;
+    background-color: #fff;
+    border-color: #0d6efd;
+    border-bottom-color: #fff;
+    font-weight: 600;
+}
+
+/* 卡片头部标签页特殊样式 */
+.card-header-tabs {
+    margin-top: -1.25rem;
+    margin-bottom: -1.25rem;
+}
+
+.card-header-tabs .nav-link {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.card-header-tabs .nav-link:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: transparent;
+}
+
+.card-header-tabs .nav-link.active {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.2);
+    border-bottom-color: transparent;
+    font-weight: 600;
+}

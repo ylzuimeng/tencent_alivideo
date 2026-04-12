@@ -207,33 +207,20 @@ async function saveTemplate(mode) {
     try {
         showToast('正在保存模板...', 'info');
 
+        // 统一使用相同的API端点
         const url = currentTemplateId
             ? `/api/video_templates/${currentTemplateId}`
             : '/api/video_templates';
 
         const method = currentTemplateId ? 'PUT' : 'POST';
 
-        // 根据模式选择不同的API端点
-        if (mode === 'advanced') {
-            data.timeline_json = data.timeline_json;
-            // 使用高级模板API
-            const response = await fetch('/api/video_templates/advanced', {
-                method: currentTemplateId ? 'PUT' : 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
-            const result = await response.json();
-            handleSaveResult(result);
-        } else {
-            // 使用普通模板API
-            const response = await fetch(url, {
-                method: method,
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
-            const result = await response.json();
-            handleSaveResult(result);
-        }
+        const response = await fetch(url, {
+            method: method,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        handleSaveResult(result);
 
     } catch (error) {
         console.error('保存失败:', error);
@@ -438,6 +425,72 @@ function resetAdvancedForm() {
     document.getElementById('editingProduceConfig').value = '';
 }
 
+// ========== 取消编辑 ==========
+function cancelEdit() {
+    // 检查是否有未保存的更改
+    const hasChanges = checkForUnsavedChanges();
+
+    if (hasChanges) {
+        // 使用自定义确认对话框
+        if (confirm('您有未保存的更改，确定要取消编辑吗？')) {
+            returnToTemplateList();
+        }
+    } else {
+        returnToTemplateList();
+    }
+}
+
+function checkForUnsavedChanges() {
+    // 检查简单模式表单是否有内容
+    const simpleName = document.getElementById('templateName').value.trim();
+    const simpleDesc = document.getElementById('templateDescription').value.trim();
+
+    // 检查高级模式表单是否有内容
+    const advancedName = document.getElementById('templateNameAdvanced').value.trim();
+    const timelineJson = document.getElementById('timelineJson').value.trim();
+
+    // 如果是新建模板（currentTemplateId为null），检查表单是否有内容
+    if (!currentTemplateId) {
+        return !!(simpleName || simpleDesc || advancedName || timelineJson);
+    } else {
+        // 如果是编辑现有模板，这里可以添加更复杂的比较逻辑
+        // 简化版本：总是提示用户确认
+        return true;
+    }
+}
+
+function returnToTemplateList() {
+    // 清空当前编辑状态
+    currentTemplateId = null;
+    currentMode = 'simple';
+
+    // 重置表单
+    resetForm();
+    resetAdvancedForm();
+
+    // 返回模板列表视图
+    document.getElementById('mainEditor').style.display = 'none';
+    document.getElementById('templatesList').style.display = 'block';
+
+    // 切换到简单模式标签
+    const simpleTab = document.getElementById('simpleModeTab');
+    const advancedTab = document.getElementById('advancedModeTab');
+
+    if (simpleTab && advancedTab) {
+        simpleTab.classList.add('active');
+        advancedTab.classList.remove('active');
+
+        // 显示简单模式面板，隐藏高级模式面板
+        document.getElementById('simpleMode').classList.add('show', 'active');
+        document.getElementById('advancedMode').classList.remove('show', 'active');
+    }
+
+    // 重新加载模板列表
+    loadTemplatesList();
+
+    showToast('已取消编辑', 'info');
+}
+
 // ========== 模板列表 ==========
 
 async function loadTemplatesList() {
@@ -501,10 +554,8 @@ async function editTemplate(templateId, isAdvanced) {
     try {
         currentTemplateId = templateId;
 
-        // 根据模板类型选择API
-        const url = isAdvanced
-            ? `/api/video_templates/advanced/${templateId}`
-            : `/api/video_templates/${templateId}`;
+        // 使用统一的API端点（高级模板和简单模板使用相同的端点）
+        const url = `/api/video_templates/${templateId}`;
 
         const response = await fetch(url);
         const result = await response.json();
