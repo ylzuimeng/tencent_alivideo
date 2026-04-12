@@ -978,9 +978,23 @@ def get_batches():
 
 @app.route('/api/video_templates', methods=['POST'])
 def create_video_template():
-    """创建视频模板"""
+    """创建视频模板（简单模式）"""
     try:
         data = request.get_json()
+
+        # 验证必填字段
+        if not data.get('name'):
+            return jsonify({'success': False, 'message': '缺少必填字段: name'}), 400
+
+        # 验证text_overlay_config（如果提供）
+        if data.get('text_overlay_config'):
+            from services.json_validator import validate_text_overlay_config
+            is_valid, error_msg = validate_text_overlay_config(data['text_overlay_config'])
+            if not is_valid:
+                return jsonify({
+                    'success': False,
+                    'message': f'文字叠加配置验证失败: {error_msg}'
+                }), 400
 
         # 创建模板
         template = VideoTemplate(
@@ -1038,6 +1052,40 @@ def get_video_templates():
     except Exception as e:
         logger.error(f"获取视频模板列表失败: {str(e)}")
         return jsonify({'success': False, 'message': f'获取列表失败: {str(e)}'}), 500
+
+
+@app.route('/api/video_templates/<int:template_id>', methods=['GET'])
+def get_video_template(template_id):
+    """获取单个视频模板详情"""
+    try:
+        template = VideoTemplate.query.get_or_404(template_id)
+
+        template_data = {
+            'id': template.id,
+            'name': template.name,
+            'header_video_url': template.header_video_url,
+            'footer_video_url': template.footer_video_url,
+            'enable_subtitle': template.enable_subtitle,
+            'subtitle_position': template.subtitle_position,
+            'subtitle_extract_audio': template.subtitle_extract_audio,
+            'text_overlay_config': template.text_overlay_config,
+            'timeline_json': template.timeline_json,
+            'output_media_config': template.output_media_config,
+            'editing_produce_config': template.editing_produce_config,
+            'formatter_type': template.formatter_type,
+            'category': template.category,
+            'is_advanced': template.is_advanced,
+            'thumbnail_url': template.thumbnail_url,
+            'description': template.description,
+            'created_at': template.created_at.isoformat() if template.created_at else None,
+            'updated_at': template.updated_at.isoformat() if template.updated_at else None
+        }
+
+        return jsonify({'success': True, 'template': template_data})
+
+    except Exception as e:
+        logger.error(f"获取视频模板详情失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'获取失败: {str(e)}'}), 500
 
 
 @app.route('/api/video_templates/<int:template_id>', methods=['PUT'])
@@ -1152,14 +1200,15 @@ def convert_template_demo():
 
 @app.route('/api/video_templates/validate-timeline', methods=['POST'])
 def validate_timeline_json():
-    """验证Timeline JSON格式"""
+    """验证Timeline JSON格式（使用结构化JSON Schema验证）"""
     try:
-        from services.template_converter import TemplateConverter
-
         data = request.get_json()
         timeline_json = data.get('timeline_json', '')
 
-        is_valid, error_msg = TemplateConverter.validate_timeline_json(timeline_json)
+        # 使用新的JSON验证器
+        from services.json_validator import validate_timeline_json as validate
+
+        is_valid, error_msg = validate(timeline_json)
 
         return jsonify({
             'success': is_valid,
@@ -1184,7 +1233,7 @@ def unified_templates_page():
 
 @app.route('/api/video_templates/advanced', methods=['POST'])
 def create_advanced_template():
-    """创建高级VideoTemplate（支持占位符）"""
+    """创建高级VideoTemplate（支持占位符，完整JSON验证）"""
     try:
         data = request.get_json()
 
@@ -1192,11 +1241,34 @@ def create_advanced_template():
         if 'name' not in data or 'timeline_json' not in data:
             return jsonify({'success': False, 'message': '缺少必填字段: name, timeline_json'}), 400
 
-        # 验证timeline_json格式
-        try:
-            json.loads(data['timeline_json'])
-        except json.JSONDecodeError:
-            return jsonify({'success': False, 'message': 'timeline_json 格式错误'}), 400
+        # 使用新的JSON验证器进行结构化验证
+        from services.json_validator import validate_timeline_json, validate_output_media_config, validate_editing_produce_config
+
+        # 验证timeline_json
+        is_valid, error_msg = validate_timeline_json(data['timeline_json'])
+        if not is_valid:
+            return jsonify({
+                'success': False,
+                'message': f'Timeline验证失败: {error_msg}'
+            }), 400
+
+        # 验证output_media_config（如果提供）
+        if data.get('output_media_config'):
+            is_valid, error_msg = validate_output_media_config(data['output_media_config'])
+            if not is_valid:
+                return jsonify({
+                    'success': False,
+                    'message': f'输出配置验证失败: {error_msg}'
+                }), 400
+
+        # 验证editing_produce_config（如果提供）
+        if data.get('editing_produce_config'):
+            is_valid, error_msg = validate_editing_produce_config(data['editing_produce_config'])
+            if not is_valid:
+                return jsonify({
+                    'success': False,
+                    'message': f'制作配置验证失败: {error_msg}'
+                }), 400
 
         # 创建模板
         template = VideoTemplate(
