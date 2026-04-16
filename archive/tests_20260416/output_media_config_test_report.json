@@ -1,0 +1,189 @@
+{
+  "timestamp": "2026-04-16T08:34:46.322150",
+  "total": 36,
+  "passed": 36,
+  "failed": 0,
+  "pass_rate": "100.0%",
+  "results": [
+    {
+      "name": "空配置（可选字段）",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "仅配置分辨率",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "720p 标准配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "1080p 标准配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "480p 分辨率配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "480p 宽屏 分辨率配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "720p 分辨率配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "1080p 分辨率配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "1440p (2K) 分辨率配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "2160p (4K) 分辨率配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "完整配置（所有参数）",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "720p + 码率配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "720p + 帧率配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "MP4 格式配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "MOV 格式配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "FLV 格式配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "MKV 格式配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "最小宽度 (240px)",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "最大宽度 (3840px)",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "最小高度 (240px)",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "最大高度 (2160px)",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "宽度超出范围 (3841px)",
+      "status": "PASS",
+      "message": "正确识别错误: Schema验证失败: 3841 is greater than the maximum of 3840 (位置: Width)"
+    },
+    {
+      "name": "高度超出范围 (2161px)",
+      "status": "PASS",
+      "message": "正确识别错误: Schema验证失败: 2161 is greater than the maximum of 2160 (位置: Height)"
+    },
+    {
+      "name": "最小码率 (100 kbps)",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "最大码率 (50000 kbps)",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "最小帧率 (1 fps)",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "最大帧率 (120 fps)",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "宽度为负数",
+      "status": "PASS",
+      "message": "正确识别错误: Schema验证失败: -1280 is less than the minimum of 240 (位置: Width)"
+    },
+    {
+      "name": "高度为负数",
+      "status": "PASS",
+      "message": "正确识别错误: Schema验证失败: -720 is less than the minimum of 240 (位置: Height)"
+    },
+    {
+      "name": "无效的视频格式",
+      "status": "PASS",
+      "message": "正确识别错误: Schema验证失败: 'avi' is not one of ['mp4', 'mov', 'flv', 'mkv'] (位置: Format)"
+    },
+    {
+      "name": "码率过低 (99 kbps)",
+      "status": "PASS",
+      "message": "正确识别错误: Schema验证失败: 99 is less than the minimum of 100 (位置: Bitrate)"
+    },
+    {
+      "name": "帧率过低 (0.5 fps)",
+      "status": "PASS",
+      "message": "正确识别错误: Schema验证失败: 0.5 is less than the minimum of 1 (位置: Fps)"
+    },
+    {
+      "name": "医疗视频标准配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "教育视频高清配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "移动端低码率配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "快速预览低质量配置",
+      "status": "PASS",
+      "message": "格式正确"
+    }
+  ]
+}

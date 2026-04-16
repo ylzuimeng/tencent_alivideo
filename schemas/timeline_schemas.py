@@ -65,15 +65,48 @@ TIMELINE_SCHEMA: Dict[str, Any] = {
                         "type": "array",
                         "items": {
                             "type": "object",
-                            "required": ["Text"],
+                            "required": ["Type"],
                             "properties": {
-                                "Text": {"type": "string"},
+                                "Type": {
+                                    "type": "string",
+                                    "enum": ["Text", "Subtitle"]
+                                },
+                                "SubType": {
+                                    "type": "string",
+                                    "enum": ["srt", "ass"]
+                                },
+                                "Content": {"type": "string"},
+                                "Text": {"type": "string"},  # Legacy field for compatibility
+                                "FileURL": {"type": "string", "format": "uri"},
                                 "X": {"type": "number"},
                                 "Y": {"type": "number"},
-                                "FontSize": {"type": "integer", "minimum": 8, "maximum": 200},
+                                "FontSize": {"type": "integer", "minimum": 8, "maximum": 5000},
                                 "FontColor": {"type": "string"},
+                                "FontColorOpacity": {"type": "number", "minimum": 0, "maximum": 1},
+                                "FontFace": {
+                                    "type": "object",
+                                    "properties": {
+                                        "Bold": {"type": "boolean"},
+                                        "Italic": {"type": "boolean"},
+                                        "Underline": {"type": "boolean"}
+                                    }
+                                },
+                                "Spacing": {"type": "integer"},
+                                "LineSpacing": {"type": "integer"},
+                                "Angle": {"type": "number"},
+                                "BorderStyle": {"type": "integer", "enum": [1, 3]},
+                                "Outline": {"type": "integer", "minimum": 0},
+                                "OutlineColour": {"type": "string"},
+                                "Alignment": {
+                                    "type": "string",
+                                    "enum": ["TopLeft", "TopCenter", "TopRight",
+                                           "CenterLeft", "CenterCenter", "CenterRight",
+                                           "BottomLeft", "BottomCenter", "BottomRight"]
+                                },
                                 "TimelineIn": {"type": "number", "minimum": 0},
-                                "TimelineOut": {"type": "number", "minimum": 0}
+                                "TimelineOut": {"type": "number", "minimum": 0},
+                                "ClipId": {"type": "string"},
+                                "ReferenceClipId": {"type": "string"}
                             }
                         }
                     }

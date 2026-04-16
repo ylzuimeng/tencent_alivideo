@@ -1,0 +1,79 @@
+{
+  "timestamp": "2026-04-16T08:30:35.058242",
+  "total": 18,
+  "passed": 17,
+  "failed": 1,
+  "pass_rate": "94.4%",
+  "results": [
+    {
+      "name": "最简单的有效 Timeline",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "包含 HTTP URL 的 Timeline",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "缺少 VideoTracks 的 Timeline",
+      "status": "PASS",
+      "message": "正确识别错误: Schema验证失败: 'VideoTracks' is a required property (位置: root)"
+    },
+    {
+      "name": "VideoTrackClips 为空的 Timeline",
+      "status": "PASS",
+      "message": "正确识别错误: Schema验证失败: [] should be non-empty (位置: VideoTracks -> 0 -> VideoTrackClips)"
+    },
+    {
+      "name": "缺少 MediaURL 的 Timeline",
+      "status": "PASS",
+      "message": "正确识别错误: Schema验证失败: 'MediaURL' is a required property (位置: VideoTracks -> 0 -> VideoTrackClips -> 0)"
+    },
+    {
+      "name": "基础 AI_ASR 字幕配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "AI_ASR 最小配置（仅必需参数）",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "完整医疗场景 AI_ASR 配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "基础文本字幕配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "使用占位符的字幕配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "字幕带 ReferenceClipId",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "完整医疗模板配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "多轨道字幕配置",
+      "status": "PASS",
+      "message": "格式正确"
+    },
+    {
+      "name": "带多种特效的视频配置",
+      "status": "PASS",
+      "message": "格式正确"
+    }
+  ]
+}

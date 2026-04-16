@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试模板编辑功能</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .test-section h2 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        .test-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .test-item.success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        .test-item.error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        .test-item .status {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .test-item.success .status {
+            background: #28a745;
+            color: white;
+        }
+        .test-item.error .status {
+            background: #dc3545;
+            color: white;
+        }
+        .test-item .label {
+            flex: 1;
+        }
+        .test-item .value {
+            font-weight: 500;
+            color: #667eea;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result-box {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .badge-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 模板编辑功能测试</h1>
+            <p>测试统一模板管理页面中的"片头片尾"模板编辑功能</p>
+        </div>
+
+        <div class="content">
+            <!-- 操作按钮 -->
+            <div class="test-section">
+                <h2>🎮 测试操作</h2>
+                <button onclick="runAllTests()">▶️ 运行所有测试</button>
+                <button onclick="clearResults()">🗑️ 清除结果</button>
+                <button onclick="window.location.href='http://127.0.0.1:5000/templates/unified'">
+                    🌐 打开模板管理页面
+                </button>
+            </div>
+
+            <!-- 测试结果 -->
+            <div class="test-section">
+                <h2>📊 测试结果</h2>
+                <div id="testResults"></div>
+            </div>
+
+            <!-- 模板信息 -->
+            <div class="test-section">
+                <h2>📋 当前模板信息</h2>
+                <div id="templateInfo"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:5000/api';
+        let testResults = [];
+
+        function addResult(test, success, message, value = '') {
+            testResults.push({ test, success, message, value });
+            updateResultsDisplay();
+        }
+
+        function updateResultsDisplay() {
+            const container = document.getElementById('testResults');
+            if (testResults.length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center;">点击"运行所有测试"开始测试</p>';
+                return;
+            }
+
+            container.innerHTML = testResults.map(r => `
+                <div class="test-item ${r.success ? 'success' : 'error'}">
+                    <div class="status">${r.success ? '✓' : '✗'}</div>
+                    <div class="label">${r.test}: ${r.message}</div>
+                    ${r.value ? `<div class="value">${r.value}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function clearResults() {
+            testResults = [];
+            updateResultsDisplay();
+            document.getElementById('templateInfo').innerHTML = '<p style="color: #999;">暂无数据</p>';
+        }
+
+        async function runAllTests() {
+            clearResults();
+            addResult('开始测试', true, '正在运行所有测试...');
+
+            try {
+                // 测试1: 获取模板列表
+                addResult('测试1', true, '正在获取模板列表...');
+                const listRes = await fetch(`${API_BASE}/video_templates`);
+                const listData = await listRes.json();
+
+                if (!listData.success) {
+                    addResult('测试1', false, '获取模板列表失败');
+                    return;
+                }
+
+                const templates = listData.templates;
+                const targetTemplate = templates.find(t => t.name.includes('片头片尾') && t.is_advanced);
+
+                if (!targetTemplate) {
+                    addResult('测试1', false, '未找到"片头片尾"模板');
+                    return;
+                }
+
+                addResult('测试1', true, '找到目标模板', targetTemplate.name);
+
+                // 测试2: 获取模板详情
+                addResult('测试2', true, '正在获取模板详情...');
+                const detailRes = await fetch(`${API_BASE}/video_templates/${targetTemplate.id}`);
+                const detailData = await detailRes.json();
+
+                if (!detailData.success) {
+                    addResult('测试2', false, '获取模板详情失败');
+                    return;
+                }
+
+                const template = detailData.template;
+                addResult('测试2', true, '获取模板详情成功',
+                    `名称: ${template.name}, 类型: ${template.is_advanced ? '高级' : '简单'}`);
+
+                // 显示模板信息
+                displayTemplateInfo(template);
+
+                // 测试3: 更新模板
+                addResult('测试3', true, '正在更新模板...');
+                const updateData = {
+                    name: template.name,
+                    description: template.description + ' (测试编辑功能)',
+                    is_advanced: template.is_advanced,
+                    timeline_json: template.timeline_json,
+                    enable_subtitle: template.enable_subtitle,
+                    subtitle_position: template.subtitle_position
+                };
+
+                const updateRes = await fetch(`${API_BASE}/video_templates/${template.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updateData)
+                });
+                const updateDataResult = await updateRes.json();
+
+                if (!updateDataResult.success) {
+                    addResult('测试3', false, '更新模板失败');
+                    return;
+                }
+
+                addResult('测试3', true, '更新模板成功');
+
+                // 测试4: 验证更新
+                addResult('测试4', true, '正在验证更新...');
+                const verifyRes = await fetch(`${API_BASE}/video_templates/${template.id}`);
+                const verifyData = await verifyRes.json();
+
+                if (!verifyData.success) {
+                    addResult('测试4', false, '验证更新失败');
+                    return;
+                }
+
+                const updated = verifyData.template;
+                if (updated.description.includes('测试编辑功能')) {
+                    addResult('测试4', true, '验证更新成功', '描述已更新');
+                } else {
+                    addResult('测试4', false, '描述未正确更新');
+                }
+
+                // 恢复原始描述
+                const restoreRes = await fetch(`${API_BASE}/video_templates/${template.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: template.name,
+                        description: template.description,
+                        is_advanced: template.is_advanced,
+                        timeline_json: template.timeline_json
+                    })
+                });
+
+                addResult('清理', true, '已恢复原始数据');
+
+            } catch (error) {
+                addResult('错误', false, '测试过程中出现异常', error.message);
+            }
+        }
+
+        function displayTemplateInfo(template) {
+            const container = document.getElementById('templateInfo');
+
+            let timelineInfo = '';
+            try {
+                if (template.timeline_json) {
+                    const timeline = JSON.parse(template.timeline_json);
+                    timelineInfo = `<p><strong>Timeline:</strong> ${timeline.VideoTracks.length} 个视频轨道</p>`;
+                }
+            } catch (e) {
+                timelineInfo = '<p><strong>Timeline:</strong> 解析失败</p>';
+            }
+
+            container.innerHTML = `
+                <div class="test-item success">
+                    <div class="status">📝</div>
+                    <div class="label">ID</div>
+                    <div class="value">${template.id}</div>
+                </div>
+                <div class="test-item success">
+                    <div class="status">📝</div>
+                    <div class="label">名称</div>
+                    <div class="value">${template.name}</div>
+                </div>
+                <div class="test-item success">
+                    <div class="status">📝</div>
+                    <div class="label">类型</div>
+                    <div class="value">${template.is_advanced ? '高级模板' : '简单模板'}</div>
+                </div>
+                <div class="test-item success">
+                    <div class="status">📝</div>
+                    <div class="label">分类</div>
+                    <div class="value">${template.category || '-'}</div>
+                </div>
+                <div class="test-item success">
+                    <div class="status">📝</div>
+                    <div class="label">格式化器</div>
+                    <div class="value">${template.formatter_type || '-'}</div>
+                </div>
+                <div class="test-item success">
+                    <div class="status">📝</div>
+                    <div class="label">描述</div>
+                    <div class="value">${template.description || '-'}</div>
+                </div>
+                ${timelineInfo}
+                <div class="test-item success">
+                    <div class="status">📝</div>
+                    <div class="label">字幕</div>
+                    <div class="value">${template.enable_subtitle ? '启用' : '禁用'} (${template.subtitle_position || '默认'})</div>
+                </div>
+            `;
+        }
+
+        // 页面加载时显示提示
+        document.addEventListener('DOMContentLoaded', () => {
+            updateResultsDisplay();
+            document.getElementById('templateInfo').innerHTML =
+                '<p style="color: #999;">点击"运行所有测试"查看模板信息</p>';
+        });
+    </script>
+</body>
+</html>

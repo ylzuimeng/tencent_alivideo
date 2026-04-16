@@ -413,24 +413,14 @@ function updateTemplatePreview() {
 
     const template = templates.find(t => t.id == templateId);
     if (template) {
-        // 检查是否是高级模板
-        if (template.is_advanced) {
-            info.innerHTML = `
-                <strong>⚡ 高级模板</strong>：支持在 Timeline JSON 中自由配置主视频位置。
-                <a href="/advanced_templates" target="_blank">查看高级模板管理 →</a>
-            `;
-            preview.style.display = 'block';
-            return;
-        }
-
-        // 普通模板显示特性
+        // 显示模板特性
         const features = [];
         if (template.header_video_url) features.push('片头');
         if (template.footer_video_url) features.push('片尾');
         if (template.enable_subtitle) features.push('字幕');
         if (template.subtitle_extract_audio) features.push('语音提取');
 
-        info.textContent = features.length > 0 ? `标准模板：${features.join('、')}` : '标准模板：无特殊配置';
+        info.textContent = features.length > 0 ? `模板特性：${features.join('、')}` : '标准模板：无特殊配置';
         preview.style.display = 'block';
     }
 }

@@ -398,7 +398,12 @@ class ICEClient:
             }, ensure_ascii=False)
 
             submit_response = self.client.submit_media_producing_job(submit_request)
-            logger.info(f"提交剪辑作业成功: {submit_response.body.job_id}")
+
+            # 🔍 记录提交的完整信息用于调试
+            logger.info(f"🔍 提交剪辑作业成功 - Job ID: {submit_response.body.job_id}")
+            logger.info(f"🔍 提交的 Timeline: {timeline}")
+            logger.info(f"🔍 提交的 OutputMediaConfig: {submit_request.output_media_config}")
+            logger.info(f"🔍 完整响应: {submit_response}")
 
             return {
                 'project_id': project_id,
@@ -426,6 +431,9 @@ class ICEClient:
             request.job_id = job_id
 
             response = self.client.get_media_producing_job(request)
+
+            # 🔍 记录完整响应用于调试
+            logger.info(f"🔍 阿里云 ICE 完整响应: {response}")
 
             # 解析状态 - response.body.media_producing_job 是一个对象
             job_obj = response.body.media_producing_job

@@ -1,0 +1,53 @@
+{
+  "recommended": {
+    "name": "720p 标准配置（推荐）",
+    "config": {
+      "Width": 1280,
+      "Height": 720
+    }
+  },
+  "1080p": {
+    "name": "1080p 高清配置",
+    "config": {
+      "Width": 1920,
+      "Height": 1080
+    }
+  },
+  "full": {
+    "name": "完整配置",
+    "config": {
+      "Width": 1280,
+      "Height": 720,
+      "Bitrate": 2000,
+      "Fps": 30,
+      "Format": "mp4"
+    }
+  },
+  "mobile": {
+    "name": "移动端优化",
+    "config": {
+      "Width": 854,
+      "Height": 480,
+      "Bitrate": 800,
+      "Fps": 24
+    }
+  },
+  "preview": {
+    "name": "快速预览",
+    "config": {
+      "Width": 640,
+      "Height": 360,
+      "Bitrate": 500,
+      "Fps": 15
+    }
+  },
+  "4k": {
+    "name": "4K 超高清",
+    "config": {
+      "Width": 3840,
+      "Height": 2160,
+      "Bitrate": 15000,
+      "Fps": 30
+    }
+  }
+}

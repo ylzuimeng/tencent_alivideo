@@ -143,6 +143,10 @@ db/data.db
 app.log
 *.log
 
+# Documentation
+docs/
+ARCHITECTURE_*.md
+
 # Test files and archives
 tests/
 archives/

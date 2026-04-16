@@ -979,7 +979,7 @@ def get_batches():
 
 @app.route('/api/video_templates', methods=['POST'])
 def create_video_template():
-    """创建视频模板（简单模式）"""
+    """创建视频模板（支持简单模式和高级模式）"""
     try:
         data = request.get_json()
 
@@ -987,25 +987,52 @@ def create_video_template():
         if not data.get('name'):
             return jsonify({'success': False, 'message': '缺少必填字段: name'}), 400
 
-        # 验证text_overlay_config（如果提供）
-        if data.get('text_overlay_config'):
-            from services.json_validator import validate_text_overlay_config
-            is_valid, error_msg = validate_text_overlay_config(data['text_overlay_config'])
+        # 判断是否为高级模式
+        is_advanced = data.get('is_advanced', False)
+
+        # 高级模式：验证timeline_json
+        if is_advanced:
+            if not data.get('timeline_json'):
+                return jsonify({'success': False, 'message': '高级模板必须提供 timeline_json'}), 400
+
+            # 验证Timeline JSON
+            from services.json_validator import validate_timeline_json
+            is_valid, error_msg = validate_timeline_json(data.get('timeline_json'))
             if not is_valid:
                 return jsonify({
                     'success': False,
-                    'message': f'文字叠加配置验证失败: {error_msg}'
+                    'message': f'Timeline JSON验证失败: {error_msg}'
                 }), 400
+
+        # 简单模式：验证text_overlay_config（如果提供）
+        else:
+            if data.get('text_overlay_config'):
+                from services.json_validator import validate_text_overlay_config
+                is_valid, error_msg = validate_text_overlay_config(data['text_overlay_config'])
+                if not is_valid:
+                    return jsonify({
+                        'success': False,
+                        'message': f'文字叠加配置验证失败: {error_msg}'
+                    }), 400
 
         # 创建模板
         template = VideoTemplate(
             name=data.get('name'),
+            is_advanced=is_advanced,
+            category=data.get('category'),
+            # 简单模式字段
             header_video_url=data.get('header_video_url'),
             footer_video_url=data.get('footer_video_url'),
             enable_subtitle=data.get('enable_subtitle', False),
             subtitle_position=data.get('subtitle_position', 'bottom'),
             subtitle_extract_audio=data.get('subtitle_extract_audio', True),
             text_overlay_config=data.get('text_overlay_config'),
+            # 高级模式字段
+            timeline_json=data.get('timeline_json'),
+            output_media_config=data.get('output_media_config'),
+            editing_produce_config=data.get('editing_produce_config'),
+            formatter_type=data.get('formatter_type'),
+            thumbnail_url=data.get('thumbnail_url'),
             description=data.get('description', '')
         )
 
@@ -1091,14 +1118,42 @@ def get_video_template(template_id):
 
 @app.route('/api/video_templates/<int:template_id>', methods=['PUT'])
 def update_video_template(template_id):
-    """更新视频模板"""
+    """更新视频模板（支持简单模式和高级模式）"""
     try:
         template = VideoTemplate.query.get_or_404(template_id)
         data = request.get_json()
 
-        # 更新字段
+        # 验证高级模式的timeline_json（如果提供）
+        if data.get('timeline_json'):
+            from services.json_validator import validate_timeline_json
+            is_valid, error_msg = validate_timeline_json(data['timeline_json'])
+            if not is_valid:
+                return jsonify({
+                    'success': False,
+                    'message': f'Timeline JSON验证失败: {error_msg}'
+                }), 400
+
+        # 验证简单模式的text_overlay_config（如果提供）
+        if data.get('text_overlay_config'):
+            from services.json_validator import validate_text_overlay_config
+            is_valid, error_msg = validate_text_overlay_config(data['text_overlay_config'])
+            if not is_valid:
+                return jsonify({
+                    'success': False,
+                    'message': f'文字叠加配置验证失败: {error_msg}'
+                }), 400
+
+        # 更新基础字段
         if 'name' in data:
             template.name = data['name']
+        if 'description' in data:
+            template.description = data['description']
+        if 'category' in data:
+            template.category = data['category']
+        if 'is_advanced' in data:
+            template.is_advanced = data['is_advanced']
+
+        # 更新简单模式字段
         if 'header_video_url' in data:
             template.header_video_url = data['header_video_url']
         if 'footer_video_url' in data:
@@ -1111,8 +1166,18 @@ def update_video_template(template_id):
             template.subtitle_extract_audio = data['subtitle_extract_audio']
         if 'text_overlay_config' in data:
             template.text_overlay_config = data['text_overlay_config']
-        if 'description' in data:
-            template.description = data['description']
+
+        # 更新高级模式字段
+        if 'timeline_json' in data:
+            template.timeline_json = data['timeline_json']
+        if 'output_media_config' in data:
+            template.output_media_config = data['output_media_config']
+        if 'editing_produce_config' in data:
+            template.editing_produce_config = data['editing_produce_config']
+        if 'formatter_type' in data:
+            template.formatter_type = data['formatter_type']
+        if 'thumbnail_url' in data:
+            template.thumbnail_url = data['thumbnail_url']
 
         db.session.commit()
 
