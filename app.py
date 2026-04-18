@@ -1218,6 +1218,102 @@ def unified_templates_page():
     return render_template('unified_templates.html')
 
 
+# ==================== 模板转换API ====================
+
+def _create_temp_template_from_simple(data: dict) -> VideoTemplate:
+    """创建临时 VideoTemplate 用于转换（不持久化到数据库）"""
+    return VideoTemplate(
+        name=data.get('name', 'Temp'),
+        header_video_url=data.get('header_video_url'),
+        footer_video_url=data.get('footer_video_url'),
+        enable_subtitle=data.get('enable_subtitle', False),
+        subtitle_position=data.get('subtitle_position', 'bottom'),
+        subtitle_extract_audio=data.get('subtitle_extract_audio', True),
+        text_overlay_config=data.get('text_overlay_config'),
+        is_advanced=False
+    )
+
+
+def _create_temp_template_from_advanced(timeline_json: str) -> VideoTemplate:
+    """创建临时 VideoTemplate 用于转换（不持久化到数据库）"""
+    return VideoTemplate(
+        name='Temp',
+        timeline_json=timeline_json,
+        is_advanced=True
+    )
+
+
+@app.route('/api/video_templates/convert-demo', methods=['POST'])
+def convert_template_demo():
+    """在简单模式和高级模式之间转换模板（不保存到数据库）"""
+    try:
+        req_data = request.get_json()
+
+        if not req_data.get('mode'):
+            return jsonify({'success': False, 'message': '缺少mode参数'}), 400
+
+        mode = req_data['mode']
+
+        # 简单模式 → 高级模式
+        if mode == 'simple-to-advanced':
+            if not req_data.get('data'):
+                return jsonify({'success': False, 'message': '缺少data参数'}), 400
+
+            simple_data = req_data['data']
+            if not simple_data.get('name'):
+                return jsonify({'success': False, 'message': '缺少name字段'}), 400
+
+            # 创建临时模板并转换
+            temp_template = _create_temp_template_from_simple(simple_data)
+
+            from services.template_converter import TemplateConverter
+            result = TemplateConverter.simple_to_advanced(temp_template)
+
+            # 验证生成的 Timeline
+            from services.json_validator import validate_timeline_json
+            is_valid, error = validate_timeline_json(result['timeline_json'])
+            if not is_valid:
+                return jsonify({'success': False, 'message': f'生成Timeline验证失败: {error}'}), 400
+
+            return jsonify({
+                'success': True,
+                'timeline_json': result['timeline_json'],
+                'output_media_config': result['output_media_config'],
+                'auto_generated': result['auto_generated']
+            })
+
+        # 高级模式 → 简单模式
+        elif mode == 'advanced-to-simple':
+            if not req_data.get('timeline_json'):
+                return jsonify({'success': False, 'message': '缺少timeline_json参数'}), 400
+
+            timeline_json = req_data['timeline_json']
+
+            # 验证输入 Timeline
+            from services.json_validator import validate_timeline_json
+            is_valid, error = validate_timeline_json(timeline_json)
+            if not is_valid:
+                return jsonify({'success': False, 'message': f'Timeline JSON验证失败: {error}'}), 400
+
+            # 创建临时模板并转换
+            temp_template = _create_temp_template_from_advanced(timeline_json)
+
+            from services.template_converter import TemplateConverter
+            result = TemplateConverter.advanced_to_simple(temp_template)
+
+            return jsonify({
+                'success': True,
+                'data': result
+            })
+
+        else:
+            return jsonify({'success': False, 'message': f'无效的mode: {mode}'}), 400
+
+    except Exception as e:
+        logger.error(f"模板转换失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'转换失败: {str(e)}'}), 500
+
+
 # ==================== Jinja2 过滤器 ====================
 
 @app.template_filter('beijing_time')
