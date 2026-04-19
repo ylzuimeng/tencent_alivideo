@@ -107,7 +107,7 @@ class OSSClient:
             logger.error(f"OSS删除异常: {str(e)}, 路径: {oss_path}")
             return False
 
-# 文件处理类
+# 文件处理类（支持视频和模板）
 class FileHandler:
     ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv'}
 
@@ -116,23 +116,10 @@ class FileHandler:
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in FileHandler.ALLOWED_EXTENSIONS
 
     @staticmethod
-    def generate_oss_path(filename):
+    def generate_oss_path(filename, prefix='uploads'):
         safe_filename = secure_filename(filename)
         timestamp = utcnow().strftime('%Y%m%d_%H%M%S')
-        return f'uploads/{timestamp}_{safe_filename}'
-
-# 模版处理类
-class TemplateHandler:
-
-    @staticmethod
-    def allowed_file(filename):
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in FileHandler.ALLOWED_EXTENSIONS
-
-    @staticmethod
-    def generate_oss_path(filename):
-        safe_filename = secure_filename(filename)
-        timestamp = utcnow().strftime('%Y%m%d_%H%M%S')
-        return f'templates/{timestamp}_{safe_filename}'
+        return f'{prefix}/{timestamp}_{safe_filename}'
 
 # 启动时验证配置
 def validate_config():
@@ -188,11 +175,6 @@ def files():
 def files_enhanced():
     """增强版文件管理页面（支持视频预览）"""
     return render_template('files_enhanced.html')
-
-@app.route('/test/api')
-def test_api():
-    """API 测试页面"""
-    return render_template('test_api.html')
 
 
 # ==================== 文件管理API ====================
@@ -256,8 +238,6 @@ def taskstyles():
 def video_templates():
     """视频模板配置页面 - 重定向到统一界面"""
     return redirect('/templates/unified')
-    files = File.query.all()  # 从File表获取视频素材，而不是Template表
-    return render_template('video_templates.html', files=files)
 
 # 获取模板列表API
 @app.route('/api/templates')
@@ -368,7 +348,7 @@ def upload_template():
             return jsonify({'error': 'OSS配置不完整，请检查环境变量'}), 500
 
         # 准备上传
-        oss_path = TemplateHandler.generate_oss_path(file.filename)
+        oss_path = FileHandler.generate_oss_path(file.filename, 'templates')
         file_content = file.read()
         file_size = len(file_content)
 
