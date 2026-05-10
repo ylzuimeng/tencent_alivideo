@@ -289,24 +289,20 @@ class ICEClient:
             logger.error(f"添加文字叠加失败: {str(e)}")
             raise
 
-    def submit_subtitle_job(self, video_url: str, output_url: str) -> Optional[Dict]:
+    def submit_subtitle_job(self, video_url: str) -> Optional[Dict]:
         """
-        提交字幕生成作业（语音识别）
+        提交字幕提取作业（ASR 语音识别）
 
         Args:
             video_url: 视频URL
-            output_url: 输出字幕文件URL
 
         Returns:
-            作业信息
+            作业信息字典，包含 job_id 和 request_id
         """
         try:
-            # 注意：这需要根据阿里云ICE的实际API进行调整
-            # 这里提供一个框架示例
-
             request = ice20201109_models.SubmitMediaProducingJobRequest()
 
-            # 构建Timeline用于字幕提取
+            # 构建 Timeline 用于字幕提取
             timeline = {
                 "VideoTracks": [{
                     "VideoTrackClips": [{
@@ -317,7 +313,6 @@ class ICEClient:
 
             request.timeline = json.dumps(timeline, ensure_ascii=False)
             request.output_media_config = json.dumps({
-                "mediaURL": output_url,
                 "SubtitleConfig": {
                     "ExtractSubtitle": True,
                     "Format": "SRT"
@@ -425,6 +420,91 @@ class ICEClient:
         Returns:
             作业状态信息
         """
+        try:
+            # 使用正确的API查询作业状态
+            request = ice20201109_models.GetMediaProducingJobRequest()
+            request.job_id = job_id
+
+            response = self.client.get_media_producing_job(request)
+
+            # 🔍 记录完整响应用于调试
+            logger.info(f"🔍 阿里云 ICE 完整响应: {response}")
+
+            # 解析状态 - response.body.media_producing_job 是一个对象
+            job_obj = response.body.media_producing_job
+
+            # 使用 to_map() 方法转换为字典
+            job_dict = job_obj.to_map() if hasattr(job_obj, 'to_map') else dict(job_obj)
+            status_code = job_dict.get('Status')
+
+            # 映射状态码到内部状态
+            status_map = {
+                'Created': 'pending',
+                'Queued': 'pending',
+                'Processing': 'processing',
+                'Success': 'completed',
+                'Finished': 'completed',
+                'Failed': 'failed',
+                'Canceled': 'failed'
+            }
+            status = status_map.get(status_code, 'pending')
+
+            # 计算进度
+            progress_map = {
+                'Created': 0,
+                'Queued': 10,
+                'Processing': 50,
+                'Success': 100,
+                'Finished': 100,
+                'Failed': 0,
+                'Canceled': 0
+            }
+            progress = progress_map.get(status_code, 0)
+
+            return {
+                'status': status,
+                'progress': progress,
+                'output_url': job_dict.get('MediaURL')
+            }
+
+        except Exception as e:
+            logger.error(f"查询作业状态失败: {str(e)}")
+            return None
+
+    def query_subtitle_job_result(self, job_id: str) -> Optional[List[Dict]]:
+        """
+        查询字幕提取作业结果，解析为统一的 segments 数组格式
+
+        Args:
+            job_id: 作业ID
+
+        Returns:
+            segments 数组，每条含 index/content/from/to；失败返回 None
+        """
+        try:
+            request = ice20201109_models.GetMediaProducingJobRequest()
+            request.job_id = job_id
+
+            response = self.client.get_media_producing_job(request)
+            job_obj = response.body.media_producing_job
+            job_dict = job_obj.to_map() if hasattr(job_obj, 'to_map') else dict(job_obj)
+
+            # 解析字幕列表
+            subtitle_list = (job_dict.get('SubtitleConfig') or {}).get('SubtitleList', [])
+            segments = []
+            for item in subtitle_list:
+                segments.append({
+                    'index': item.get('Index', len(segments)),
+                    'content': item.get('Content', ''),
+                    'from': item.get('StartTime', 0.0),
+                    'to': item.get('EndTime', 0.0),
+                })
+
+            return segments if segments else None
+
+        except Exception as e:
+            logger.error(f"查询字幕提取结果失败: {str(e)}")
+            return None
         try:
             # 使用正确的API查询作业状态
             request = ice20201109_models.GetMediaProducingJobRequest()

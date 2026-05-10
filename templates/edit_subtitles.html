@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style>
+    .edit-subtitles-container {
+        display: flex;
+        gap: 20px;
+        height: calc(100vh - 120px);
+    }
+    .video-panel {
+        flex: 0 0 60%;
+        display: flex;
+        flex-direction: column;
+    }
+    .video-panel video {
+        width: 100%;
+        border-radius: 8px;
+        background: #000;
+    }
+    .subtitle-panel {
+        flex: 0 0 40%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .subtitle-list {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 0;
+    }
+    .subtitle-item {
+        display: flex;
+        align-items: flex-start;
+        padding: 10px 12px;
+        border-bottom: 1px solid #eee;
+        transition: background-color 0.3s;
+        cursor: pointer;
+    }
+    .subtitle-item:hover {
+        background-color: #f8f9fa;
+    }
+    .subtitle-item.active {
+        background-color: #cfe2ff;
+        border-left: 4px solid #0d6efd;
+    }
+    .subtitle-time {
+        flex: 0 0 80px;
+        font-size: 12px;
+        color: #6c757d;
+        font-family: monospace;
+        padding-top: 6px;
+    }
+    .subtitle-content {
+        flex: 1;
+    }
+    .subtitle-content textarea {
+        width: 100%;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 6px 8px;
+        resize: vertical;
+        font-size: 14px;
+        min-height: 36px;
+    }
+    .subtitle-content textarea:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13,110,253,.25);
+    }
+    .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    .toolbar h3 {
+        margin: 0;
+        font-size: 18px;
+    }
+    .save-status {
+        font-size: 14px;
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+    .save-status.saved {
+        color: #198754;
+        background: #d1e7dd;
+    }
+    .save-status.saving {
+        color: #0d6efd;
+        background: #cfe2ff;
+    }
+    .save-status.unsaved {
+        color: #dc3545;
+        background: #f8d7da;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="d-flex align-items-center gap-3">
+        <h3>{{ task.task_name }}</h3>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+        <span id="saveStatus" class="save-status saved">
+            <i class="fas fa-check-circle"></i> 已保存
+        </span>
+        <button id="recomposeBtn" class="btn btn-outline-warning" onclick="handleRecompose()">
+            <i class="fas fa-sync-alt"></i> 重新合成
+        </button>
+    </div>
+</div>
+
+<div class="edit-subtitles-container">
+    <!-- 左侧视频面板 -->
+    <div class="video-panel">
+        <video id="subtitleVideo" controls preload="metadata">
+            <source src="{{ task.output_oss_url }}" type="video/mp4">
+            您的浏览器不支持视频播放。
+        </video>
+    </div>
+
+    <!-- 右侧字幕面板 -->
+    <div class="subtitle-panel">
+        <h5 class="mb-2 px-2">字幕编辑</h5>
+        <div id="subtitleList" class="subtitle-list">
+            <!-- 字幕条目由 JS 动态渲染 -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ============ SubtitleEditor ============
+class SubtitleEditor {
+    constructor(taskId) {
+        this.taskId = taskId;
+        this.segments = [];
+        this.currentIndex = -1;
+        this.saveTimeout = null;
+        this.video = document.getElementById('subtitleVideo');
+        this.subtitleList = document.getElementById('subtitleList');
+        this.saveStatus = document.getElementById('saveStatus');
+
+        this.init();
+    }
+
+    async init() {
+        await this.loadSubtitles();
+        this.renderList();
+        this.bindEvents();
+    }
+
+    // 从 API 加载字幕数据
+    async loadSubtitles() {
+        try {
+            const resp = await fetch(`/api/tasks/${this.taskId}/subtitles`);
+            const data = await resp.json();
+            this.segments = data.segments || [];
+        } catch (e) {
+            console.error('加载字幕失败:', e);
+        }
+    }
+
+    // 渲染右侧字幕列表
+    renderList() {
+        this.subtitleList.innerHTML = '';
+        this.segments.forEach((seg, i) => {
+            const item = document.createElement('div');
+            item.className = 'subtitle-item';
+            item.dataset.index = i;
+            item.innerHTML = `
+                <div class="subtitle-time">
+                    <div>${this.formatTime(seg.from)}</div>
+                    <div class="mt-1">${this.formatTime(seg.to)}</div>
+                </div>
+                <div class="subtitle-content">
+                    <textarea rows="1" data-index="${i}">${this.escapeHtml(seg.content)}</textarea>
+                </div>
+            `;
+            this.subtitleList.appendChild(item);
+        });
+    }
+
+    // 绑定事件
+    bindEvents() {
+        // video timeupdate → 高亮当前字幕
+        this.video.addEventListener('timeupdate', () => this.syncHighlight());
+
+        // 点击字幕条目 → 跳转视频位置
+        this.subtitleList.addEventListener('click', (e) => {
+            const item = e.target.closest('.subtitle-item');
+            if (!item) return;
+            const idx = parseInt(item.dataset.index);
+            if (idx >= 0 && this.segments[idx]) {
+                this.video.currentTime = this.segments[idx].from;
+                this.video.play().catch(() => {});
+            }
+        });
+
+        // textarea 输入 → 2 秒防抖自动保存
+        this.subtitleList.addEventListener('input', (e) => {
+            if (e.target.tagName === 'TEXTAREA') {
+                this.collectSegments();
+                this.setSaveStatus('unsaved', '未保存');
+                this.debounceSave();
+            }
+        });
+    }
+
+    // 同步高亮
+    syncHighlight() {
+        const currentTime = this.video.currentTime;
+        let activeIdx = -1;
+        for (let i = 0; i < this.segments.length; i++) {
+            if (currentTime >= this.segments[i].from && currentTime < this.segments[i].to) {
+                activeIdx = i;
+                break;
+            }
+        }
+        if (activeIdx !== this.currentIndex) {
+            // 移除旧高亮
+            const prev = document.querySelector('.subtitle-item.active');
+            if (prev) prev.classList.remove('active');
+            // 添加新高亮
+            if (activeIdx >= 0) {
+                const el = this.subtitleList.children[activeIdx];
+                if (el) {
+                    el.classList.add('active');
+                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+            this.currentIndex = activeIdx;
+        }
+    }
+
+    // 从 DOM 收集当前字幕内容
+    collectSegments() {
+        const textareas = this.subtitleList.querySelectorAll('textarea');
+        textareas.forEach(ta => {
+            const idx = parseInt(ta.dataset.index);
+            if (idx >= 0 && idx < this.segments.length) {
+                this.segments[idx].content = ta.value;
+            }
+        });
+    }
+
+    // 2 秒防抖保存
+    debounceSave() {
+        clearTimeout(this.saveTimeout);
+        this.saveTimeout = setTimeout(() => this.autoSave(), 2000);
+    }
+
+    // 自动保存
+    async autoSave() {
+        this.setSaveStatus('saving', '保存中...');
+        try {
+            const payload = {
+                segments: this.segments.map(s => ({
+                    index: s.index,
+                    content: s.content
+                }))
+            };
+            const resp = await fetch(`/api/tasks/${this.taskId}/subtitles`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (resp.ok) {
+                this.setSaveStatus('saved', '已保存');
+            } else {
+                this.setSaveStatus('unsaved', '保存失败');
+            }
+        } catch (e) {
+            console.error('自动保存失败:', e);
+            this.setSaveStatus('unsaved', '保存失败');
+        }
+    }
+
+    // 更新保存状态指示器
+    setSaveStatus(cls, text) {
+        this.saveStatus.className = `save-status ${cls}`;
+        const icons = { saved: 'fa-check-circle', saving: 'fa-spinner fa-spin', unsaved: 'fa-exclamation-circle' };
+        this.saveStatus.innerHTML = `<i class="fas ${icons[cls] || icons.unsaved}"></i> ${text}`;
+    }
+
+    // 格式化时间
+    formatTime(seconds) {
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    // HTML 转义
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+}
+
+// 页面初始化
+document.addEventListener('DOMContentLoaded', () => {
+    const taskId = {{ task.id }};
+    window.editor = new SubtitleEditor(taskId);
+});
+
+// 重新合成按钮
+async function handleRecompose() {
+    const taskId = {{ task.id }};
+    if (!confirm('确认重新合成？将使用修改后的字幕生成新视频。')) {
+        return;
+    }
+    const btn = document.getElementById('recomposeBtn');
+    const statusEl = document.getElementById('saveStatus');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 提交中...';
+
+    try {
+        // 提交重新合成
+        const resp = await fetch(`/api/tasks/${taskId}/recompose`, { method: 'POST' });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.error || '提交失败');
+        }
+
+        // 轮询进度
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 重新合成中...';
+        statusEl.className = 'save-status saving';
+        statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 合成中...';
+
+        let maxAttempts = 120;
+        while (maxAttempts-- > 0) {
+            await sleep(3000);
+            const progressResp = await fetch(`/api/tasks/${taskId}/progress`);
+            const progressData = await progressResp.json();
+
+            if (progressData.status === 'completed') {
+                statusEl.className = 'save-status saved';
+                statusEl.innerHTML = '<i class="fas fa-check-circle"></i> 重新合成完成';
+                btn.innerHTML = '<i class="fas fa-check-circle"></i> 已完成';
+                setTimeout(() => location.reload(), 2000);
+                return;
+            }
+            if (progressData.status === 'failed') {
+                throw new Error(progressData.error_message || '重新合成失败');
+            }
+        }
+        throw new Error('重新合成超时');
+    } catch (e) {
+        console.error('重新合成失败:', e);
+        statusEl.className = 'save-status unsaved';
+        statusEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> 合成失败';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-redo"></i> 重试';
+        alert('重新合成失败：' + e.message);
+    }
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+</script>
+{% endblock %}

@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, redirect
-from models import Template, TaskStyle
+from flask import Blueprint, render_template, redirect, abort
+from models import Template, TaskStyle, ProcessingTask
 
 pages_bp = Blueprint('pages', __name__)
 
@@ -58,6 +58,16 @@ def video_templates():
 @pages_bp.route('/doctors')
 def doctors():
     return render_template('doctors.html')
+
+
+@pages_bp.route('/tasks/<int:task_id>/edit-subtitles')
+def edit_subtitles(task_id):
+    task = ProcessingTask.query.get(task_id)
+    if not task:
+        abort(404)
+    if task.status != 'completed' or not task.subtitle_data:
+        abort(404)
+    return render_template('edit_subtitles.html', task=task)
 
 
 @pages_bp.route('/templates/unified')

@@ -268,6 +268,9 @@ class ProcessingTask(db.Model):
     # NEW: 使用高级模板标志
     use_advanced_timeline = db.Column(db.Boolean, default=False)  # 是否使用高级Timeline（占位符）
 
+    # 字幕数据（JSON格式，包含 segments/srt_file_url/generated_at）
+    subtitle_data = db.Column(db.Text)
+
     # 关联关系
     source_file = db.relationship('File', backref='processing_tasks')
 

@@ -1,7 +1,9 @@
 import logging
+import json
 from flask import Blueprint, request, jsonify
 from models import db, File, VideoTemplate, ProcessingTask
 from services.oss_service import OSSConfig, OSSClient
+from services.subtitle_service import SubtitleService
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +152,97 @@ def delete_task(task_id):
         db.session.rollback()
         logger.error(f"删除任务失败: {str(e)}")
         return jsonify({'error': f'删除任务失败: {str(e)}'}), 500
+
+
+@task_bp.route('/api/tasks/<int:task_id>/subtitles', methods=['GET'])
+def get_subtitles(task_id):
+    """获取任务的字幕数据"""
+    try:
+        task = ProcessingTask.query.get(task_id)
+        if not task:
+            return jsonify({'error': '任务不存在'}), 404
+
+        if task.status != 'completed':
+            return jsonify({'error': '任务未完成'}), 404
+
+        if not task.subtitle_data:
+            return jsonify({'error': '字幕数据不可用'}), 404
+
+        return jsonify(json.loads(task.subtitle_data))
+
+    except Exception as e:
+        logger.error(f"获取字幕数据失败: {str(e)}")
+        return jsonify({'error': f'获取字幕数据失败: {str(e)}'}), 500
+
+
+@task_bp.route('/api/tasks/<int:task_id>/subtitles', methods=['PUT'])
+def update_subtitles(task_id):
+    """更新任务的字幕文字内容"""
+    try:
+        task = ProcessingTask.query.get(task_id)
+        if not task:
+            return jsonify({'error': '任务不存在'}), 404
+
+        if task.status != 'completed':
+            return jsonify({'error': '任务未完成'}), 400
+
+        if not task.subtitle_data:
+            return jsonify({'error': '字幕数据不可用'}), 400
+
+        data = request.get_json()
+        if not data or 'segments' not in data:
+            return jsonify({'error': '缺少segments参数'}), 400
+
+        # 获取当前字幕数据
+        subtitle_data = json.loads(task.subtitle_data)
+
+        # 仅更新 content 字段，保留 from/to 时间戳
+        updated_segments = data['segments']
+        updated_data = SubtitleService.update_subtitle_content(subtitle_data, updated_segments)
+
+        # 重新生成 SRT 并上传 OSS
+        srt_content = SubtitleService.generate_srt_content(updated_data['segments'])
+        srt_url = SubtitleService.upload_srt_to_oss(srt_content, task.id)
+
+        # 更新 subtitle_data
+        updated_data['srt_file_url'] = srt_url
+        task.subtitle_data = json.dumps(updated_data, ensure_ascii=False)
+        db.session.commit()
+
+        return jsonify({
+            'message': '字幕保存成功',
+            'srt_file_url': srt_url
+        })
+
+    except Exception as e:
+        logger.error(f"更新字幕数据失败: {str(e)}")
+        return jsonify({'error': f'更新字幕数据失败: {str(e)}'}), 500
+
+
+@task_bp.route('/api/tasks/<int:task_id>/recompose', methods=['POST'])
+def recompose_task(task_id):
+    """触发字幕修改后的重新合成"""
+    try:
+        from services.task_processor import task_processor
+
+        task = ProcessingTask.query.get(task_id)
+        if not task:
+            return jsonify({'error': '任务不存在'}), 404
+
+        if task.status != 'completed':
+            return jsonify({'error': '任务未完成'}), 400
+
+        if not task.subtitle_data:
+            return jsonify({'error': '字幕数据不可用'}), 400
+
+        # 异步执行重新合成
+        task_processor.executor.submit(task_processor.recompose_with_subtitles, task.id)
+
+        return jsonify({'message': '重新合成已提交'})
+
+    except Exception as e:
+        logger.error(f"重新合成失败: {str(e)}")
+        return jsonify({'error': f'重新合成失败: {str(e)}'}), 500
 
 
 @task_bp.route('/api/tasks/<int:task_id>/retry', methods=['POST'])

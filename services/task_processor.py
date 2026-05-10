@@ -21,6 +21,7 @@ from flask import current_app
 from sqlalchemy.orm import joinedload
 from models import db, ProcessingTask, File, TaskStyle, DoctorInfo, VideoTemplate
 from services.ice_service import ICEClient
+from services.subtitle_service import SubtitleService
 
 logger = logging.getLogger(__name__)
 
@@ -304,6 +305,8 @@ class TaskProcessor:
                     task.completed_at = utcnow()
                     db.session.commit()
                     logger.info(f"任务完成: {task.task_name}")
+                    # 提取字幕（失败不影响任务状态）
+                    self._extract_subtitles(task)
                     break
 
                 elif task.status == 'failed':
@@ -324,6 +327,128 @@ class TaskProcessor:
             task.status = 'failed'
             task.error_message = "处理超时"
             db.session.commit()
+
+    def _extract_subtitles(self, task: ProcessingTask):
+        """
+        从已完成的任务视频中提取 ASR 字幕
+
+        整个过程用 try/except 包裹，失败仅记录警告，不影响任务状态。
+
+        Args:
+            task: 已完成的 ProcessingTask 实例
+        """
+        try:
+            if not task.output_oss_url:
+                return
+
+            # 检查模板是否启用字幕
+            template = task.video_template
+            if template and hasattr(template, 'enable_subtitle') and not template.enable_subtitle:
+                return
+
+            ice_client = ICEClient()
+
+            # 提交字幕提取作业
+            job_info = ice_client.submit_subtitle_job(task.output_oss_url)
+            if not job_info:
+                logger.warning(f"任务 {task.id}: 提交字幕提取作业失败")
+                return
+
+            # 轮询字幕提取结果
+            max_attempts = 60
+            for attempt in range(max_attempts):
+                segments = ice_client.query_subtitle_job_result(job_info['job_id'])
+                if segments is not None:
+                    break
+                time.sleep(3)
+            else:
+                logger.warning(f"任务 {task.id}: 字幕提取轮询超时")
+                return
+
+            if not segments:
+                logger.warning(f"任务 {task.id}: 字幕提取结果为空")
+                return
+
+            # 生成 SRT 并上传
+            srt_content = SubtitleService.generate_srt_content(segments)
+            srt_url = SubtitleService.upload_srt_to_oss(srt_content, task.id)
+
+            # 写入 subtitle_data
+            subtitle_data = {
+                'segments': segments,
+                'srt_file_url': srt_url,
+                'generated_at': utcnow().isoformat()
+            }
+            task.subtitle_data = json.dumps(subtitle_data, ensure_ascii=False)
+            db.session.commit()
+
+            logger.info(f"任务 {task.id}: 字幕提取成功，共 {len(segments)} 条")
+
+        except Exception as e:
+            logger.warning(f"任务 {task.id}: 字幕提取失败（不影响任务状态）: {str(e)}")
+
+    def recompose_with_subtitles(self, task_id: int):
+        """重新合成视频，仅替换字幕轨道
+
+        Args:
+            task_id: ProcessingTask ID
+        """
+        with self.get_app_context():
+            task = ProcessingTask.query.get(task_id)
+            if not task or not task.subtitle_data:
+                return
+
+            subtitle_data = json.loads(task.subtitle_data)
+            srt_url = subtitle_data['srt_file_url']
+
+            # 重建基础 Timeline（获取原始结构）
+            source_file = File.query.get(task.source_file_id) if task.source_file_id else None
+            main_video_url = source_file.oss_url if source_file else task.output_oss_url
+            base_timeline = self._build_timeline(task, main_video_url)
+
+            # 替换字幕轨道
+            new_timeline = SubtitleService.build_subtitle_timeline(base_timeline, srt_url)
+
+            # 生成新的输出 URL
+            new_output_url = self._generate_output_url(task)
+
+            old_output_url = task.output_oss_url
+
+            # 提交 ICE 编辑作业
+            ice_client = ICEClient()
+            job_info = ice_client.submit_editing_job(new_timeline, new_output_url)
+
+            # 轮询完成
+            max_attempts = 120
+            for attempt in range(max_attempts):
+                status_info = ice_client.query_job_status(job_info['job_id'])
+                if not status_info:
+                    time.sleep(5)
+                    continue
+                if status_info['status'] == 'completed':
+                    task.output_oss_url = status_info.get('output_url') or new_output_url
+                    break
+                if status_info['status'] == 'failed':
+                    raise Exception('ICE 作业失败：' + job_info['job_id'])
+                time.sleep(5)
+
+            db.session.commit()
+
+            # 删除旧 OSS 文件（best-effort）
+            if old_output_url:
+                try:
+                    from services.oss_service import OSSConfig, OSSClient
+                    oss_config = OSSConfig()
+                    oss_client = OSSClient(oss_config)
+                    filename = old_output_url.split('/')[-1]
+                    oss_path = f"processed_videos/{filename}"
+                    result = oss_client.delete_file(oss_path)
+                    if result:
+                        logger.info(f"任务 {task.id}: 旧输出文件已删除: {oss_path}")
+                    else:
+                        logger.warning(f"任务 {task.id}: 删除旧输出文件失败: {oss_path}")
+                except Exception as e:
+                    logger.warning(f"任务 {task.id}: 删除旧输出文件异常（不影响结果）: {str(e)}")
 
     def get_task_status(self, task_id: int) -> Optional[Dict]:
         """
@@ -388,7 +513,8 @@ class TaskProcessor:
             'source_file_name': task.source_file.filename if task.source_file else None,
             'template_name': task.video_template.name if task.video_template else
                           (task.task_style.name if task.task_style else None),
-            'doctor_name': task.doctor_info.name if task.doctor_info else None
+            'doctor_name': task.doctor_info.name if task.doctor_info else None,
+            'has_subtitle_data': task.subtitle_data is not None,
         } for task in tasks]
 
 
