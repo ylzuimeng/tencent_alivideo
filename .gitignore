@@ -151,3 +151,6 @@ ARCHITECTURE_*.md
 tests/
 archives/
 .playwright-mcp/
+
+# Work files
+work/
