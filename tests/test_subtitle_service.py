@@ -266,45 +266,39 @@ class TestICESubtitleJob:
         with patch.object(ICEClient, '_create_client', return_value=MagicMock()):
             return ICEClient()
 
-    def test_submit_subtitle_job_sends_correct_timeline(self):
-        """submit_subtitle_job 构建包含 ExtractSubtitle 的请求"""
+    def test_submit_subtitle_job_returns_job_info(self):
+        """submit_subtitle_job 返回 job_id 和 request_id"""
         client = self._make_ice_client()
 
         mock_response = MagicMock()
         mock_response.body.job_id = 'job-123'
         mock_response.body.request_id = 'req-456'
-        client.client.submit_media_producing_job.return_value = mock_response
+        client.client.submit_asrjob.return_value = mock_response
 
         result = client.submit_subtitle_job('https://oss.example.com/video.mp4')
 
         assert result is not None
         assert result['job_id'] == 'job-123'
+        assert result['request_id'] == 'req-456'
 
-        # 验证请求参数包含 ExtractSubtitle
-        call_args = client.client.submit_media_producing_job.call_args
-        request = call_args[0][0]
-        output_config = json.loads(request.output_media_config)
-        assert output_config.get('SubtitleConfig', {}).get('ExtractSubtitle') is True
-        assert output_config['SubtitleConfig']['Format'] == 'SRT'
+        # 验证调用的是 submit_asrjob
+        client.client.submit_asrjob.assert_called_once()
 
     def test_query_subtitle_job_result_returns_segments(self):
-        """query_subtitle_job_result 解析作业结果为 segments 数组"""
+        """query_subtitle_job_result 解析 AiResult 为 segments 数组"""
         client = self._make_ice_client()
 
-        # 模拟 ICE 返回的字幕提取结果
+        # 模拟 ICE GetSmartHandleJob 返回结果
+        ai_result = json.dumps([
+            {'content': '第一句话', 'from': 0.0, 'to': 2.5},
+            {'content': '第二句话', 'from': 3.0, 'to': 5.0},
+        ])
         mock_response = MagicMock()
-        job_dict = {
-            'Status': 'Success',
-            'MediaURL': 'https://oss.example.com/output.mp4',
-            'SubtitleConfig': {
-                'SubtitleList': [
-                    {'Index': 0, 'Content': '第一句话', 'StartTime': 0.0, 'EndTime': 2.5},
-                    {'Index': 1, 'Content': '第二句话', 'StartTime': 3.0, 'EndTime': 5.0},
-                ]
-            }
+        mock_response.body.to_map.return_value = {
+            'State': 'Finished',
+            'JobResult': {'AiResult': ai_result}
         }
-        mock_response.body.media_producing_job.to_map.return_value = job_dict
-        client.client.get_media_producing_job.return_value = mock_response
+        client.client.get_smart_handle_job.return_value = mock_response
 
         segments = client.query_subtitle_job_result('job-123')
 
@@ -317,7 +311,7 @@ class TestICESubtitleJob:
     def test_query_subtitle_job_result_returns_none_on_failure(self):
         """查询失败时返回 None"""
         client = self._make_ice_client()
-        client.client.get_media_producing_job.side_effect = Exception('ICE error')
+        client.client.get_smart_handle_job.side_effect = Exception('ICE error')
 
         result = client.query_subtitle_job_result('job-bad')
         assert result is None
