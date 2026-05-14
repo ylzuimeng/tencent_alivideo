@@ -154,3 +154,9 @@ archives/
 
 # Work files
 work/
+
+# AI tools
+.agents/
+.claude/
+learn/
+skills-lock.json
