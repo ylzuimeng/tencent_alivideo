@@ -99,7 +99,7 @@ class TaskProcessor:
                     try:
                         with self.get_app_context():
                             failed_task = ProcessingTask.query.get(task.id)
-                            if failed_task and failed_task.status == 'pending':
+                            if failed_task and failed_task.status in ('pending', 'processing'):
                                 failed_task.status = 'failed'
                                 failed_task.error_message = str(e)[:500]
                                 db.session.commit()
@@ -339,13 +339,19 @@ class TaskProcessor:
         """
         try:
             if not task.output_oss_url:
+                logger.warning(f"任务 {task.id}: 无 output_oss_url 跳过字幕提取")
                 return
 
             # 检查模板是否启用字幕
             template = task.video_template
-            if template and hasattr(template, 'enable_subtitle') and not template.enable_subtitle:
+            if not template:
+                logger.info(f"任务 {task.id}: 无模板，跳过字幕提取")
+                return
+            if hasattr(template, 'enable_subtitle') and not template.enable_subtitle:
+                logger.info(f"任务 {task.id}: 模板未启用字幕，跳过提取")
                 return
 
+            logger.info(f"任务 {task.id}: 开始字幕提取，视频URL: {task.output_oss_url}")
             ice_client = ICEClient()
 
             # 提交字幕提取作业
@@ -431,6 +437,8 @@ class TaskProcessor:
                 if status_info['status'] == 'failed':
                     raise Exception('ICE 作业失败：' + job_info['job_id'])
                 time.sleep(5)
+            else:
+                raise Exception('字幕重新合成轮询超时')
 
             db.session.commit()
 

@@ -13,6 +13,7 @@ class Config:
     OSS_ACCESS_KEY_SECRET = os.getenv('OSS_ACCESS_KEY_SECRET')
     OSS_BUCKET_NAME = os.getenv('OSS_BUCKET_NAME')
     OSS_ENDPOINT = os.getenv('OSS_ENDPOINT', 'http://oss-cn-shanghai.aliyuncs.com')
+    OSS_STS_ROLE_ARN = os.getenv('OSS_STS_ROLE_ARN')
     
     # 上传配置
     MAX_CONTENT_LENGTH = 500 * 1024 * 1024  # 限制上传文件大小为500MB

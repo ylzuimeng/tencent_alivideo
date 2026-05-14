@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Agent skills
+
+### Issue tracker
+
+Issues tracked via GitHub Issues using the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Using default triage labels: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: CONTEXT.md + docs/adr/ at repo root. See `docs/agents/domain.md`.
+
 ## Project Overview
 
 This is a Flask web application for uploading and managing video files and templates. It uses Alibaba Cloud OSS (Object Storage Service) for file storage and SQLite for metadata persistence.

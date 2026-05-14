@@ -229,6 +229,7 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/oss-upload.js') }}?v=1.0"></script>
 <script>
 let uploadQueue = [];
 let doctors = [];
@@ -240,6 +241,10 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeEventListeners();
     loadDoctors();
     loadTemplates();
+    // 清理超过24小时的断点
+    if (typeof ossUploader !== 'undefined') {
+        ossUploader.clearStaleCheckpoints();
+    }
 });
 
 // 初始化事件监听器
@@ -468,14 +473,115 @@ function addFileCard(fileInfo) {
             </div>
             <div class="file-status ms-3">
                 <span class="badge bg-secondary">等待上传</span>
+                <button class="btn btn-sm btn-outline-danger ms-1" onclick="cancelUpload('${fileInfo.id}')" style="display:none;">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
         </div>
     `;
     container.appendChild(card);
 }
 
-// 上传文件
+// 上传文件（尝试直传OSS，失败降级到后端中转）
+let directUploadAvailable = null;  // 三态: null=未检测, true=可用, false=不可用
+
 async function uploadFile(fileInfo) {
+    // 尝试直传OSS
+    if (directUploadAvailable !== false) {
+        try {
+            await uploadFileDirect(fileInfo);
+            return;
+        } catch (error) {
+            console.warn('直传OSS失败，降级到后端中转:', error);
+            directUploadAvailable = false;
+        }
+    }
+    // 降级：后端中转上传
+    await uploadFileLegacy(fileInfo);
+}
+
+// 直传OSS上传
+async function uploadFileDirect(fileInfo) {
+    try {
+        // 1. 初始化OSS客户端
+        await ossUploader.initClient();
+        directUploadAvailable = true;
+
+        // 2. 获取OSS路径
+        updateFileStatus(fileInfo.id, 'pending', '准备上传...', 'info');
+
+        const pathResponse = await fetch('/api/upload/generate-path', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ filename: fileInfo.file.name, prefix: 'uploads' })
+        });
+        const pathData = await pathResponse.json();
+        if (!pathResponse.ok) {
+            throw new Error(pathData.message || '路径生成失败');
+        }
+
+        // 3. 直传OSS
+        updateFileStatus(fileInfo.id, 'pending', '上传中...', 'info');
+        showCancelButton(fileInfo.id);
+
+        const result = await ossUploader.upload(fileInfo, pathData.oss_path, (percent) => {
+            updateFileProgress(fileInfo.id, percent);
+        });
+
+        if (result.cancelled) {
+            updateFileStatus(fileInfo.id, 'error', '已取消', 'secondary');
+            return;
+        }
+
+        // 4. 通知后端创建记录
+        updateFileProgress(fileInfo.id, 98);
+
+        const completeResponse = await fetch('/api/upload/complete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                filename: fileInfo.file.name,
+                oss_url: pathData.oss_url,
+                size: fileInfo.file.size,
+                prefix: 'uploads'
+            })
+        });
+        const completeData = await completeResponse.json();
+
+        if (!completeResponse.ok) {
+            throw new Error(completeData.message || '记录创建失败');
+        }
+
+        // 5. 更新UI
+        updateFileProgress(fileInfo.id, 100);
+        updateFileStatus(fileInfo.id, 'uploaded', '上传成功', 'success');
+        fileInfo.uploaded = true;
+        fileInfo.dbFileId = completeData.file_id;
+        updateFileCard(fileInfo);
+
+        uploadedCount++;
+        updateUploadHint();
+        Toast.success(`✅ ${fileInfo.file.name} 上传成功！请点击"处理"按钮继续操作`);
+
+        setTimeout(() => {
+            const card = document.getElementById(`file-${fileInfo.id}`);
+            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+
+    } catch (error) {
+        // 上传中断：显示恢复按钮
+        if (ossUploader.loadCheckpoint(fileInfo.id)) {
+            updateFileStatus(fileInfo.id, 'error', '上传中断', 'warning');
+            addResumeButton(fileInfo.id);
+        } else {
+            updateFileStatus(fileInfo.id, 'error', '上传失败', 'danger');
+        }
+        throw error;
+    }
+}
+
+// 降级：后端中转上传（原始方式）
+async function uploadFileLegacy(fileInfo) {
     const formData = new FormData();
     formData.append('file', fileInfo.file);
 
@@ -485,7 +591,7 @@ async function uploadFile(fileInfo) {
 
         xhr.upload.onprogress = (e) => {
             if (e.lengthComputable) {
-                const progress = Math.min(Math.round((e.loaded * e.total) / e.total), 95);
+                const progress = Math.min(Math.round((e.loaded / e.total) * 100), 95);
                 updateFileProgress(fileInfo.id, progress);
             }
         };
@@ -499,20 +605,9 @@ async function uploadFile(fileInfo) {
                 fileInfo.dbFileId = result.file_id;
                 updateFileCard(fileInfo);
 
-                // 更新上传计数
                 uploadedCount++;
                 updateUploadHint();
-
-                // 显示成功提示
-                Toast.success(`✅ ${fileInfo.file.name} 上传成功！请点击"处理"按钮继续操作`);
-
-                // 滚动到文件列表
-                setTimeout(() => {
-                    const card = document.getElementById(`file-${fileInfo.id}`);
-                    if (card) {
-                        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                }, 100);
+                Toast.success(`✅ ${fileInfo.file.name} 上传成功！`);
             } else {
                 const error = JSON.parse(xhr.responseText);
                 updateFileStatus(fileInfo.id, 'error', error.error || '上传失败', 'danger');
@@ -527,6 +622,104 @@ async function uploadFile(fileInfo) {
     } catch (error) {
         updateFileStatus(fileInfo.id, 'error', '上传失败', 'danger');
     }
+}
+
+// 恢复上传
+async function resumeUpload(fileId) {
+    const fileInfo = uploadQueue.find(f => f.id === fileId);
+    if (!fileInfo) return;
+
+    updateFileStatus(fileId, 'pending', '恢复上传中...', 'info');
+
+    try {
+        await ossUploader.initClient();
+
+        // 从断点获取oss路径
+        const cp = ossUploader.loadCheckpoint(fileId);
+        const ossPath = cp ? cp.name : null;
+
+        if (!ossPath) {
+            Toast.error('断点信息丢失，请重新上传');
+            ossUploader.clearCheckpoint(fileId);
+            return;
+        }
+
+        const result = await ossUploader.upload(fileInfo, ossPath, (percent) => {
+            updateFileProgress(fileId, percent);
+        });
+
+        if (result.cancelled) {
+            updateFileStatus(fileId, 'error', '已取消', 'secondary');
+            return;
+        }
+
+        // 构建完整URL并通知后端
+        const ossConfig = await fetch('/api/upload/sts-token').then(r => r.json());
+        const bucket = ossConfig.data.bucket;
+        const endpoint = ossConfig.data.endpoint;
+        const ossUrl = `https://${bucket}.${endpoint}/${ossPath}`;
+
+        updateFileProgress(fileId, 98);
+        const completeResponse = await fetch('/api/upload/complete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                filename: fileInfo.file.name,
+                oss_url: ossUrl,
+                size: fileInfo.file.size,
+                prefix: 'uploads'
+            })
+        });
+        const completeData = await completeResponse.json();
+
+        if (!completeResponse.ok) {
+            throw new Error(completeData.message || '记录创建失败');
+        }
+
+        updateFileProgress(fileId, 100);
+        updateFileStatus(fileId, 'uploaded', '上传成功', 'success');
+        fileInfo.uploaded = true;
+        fileInfo.dbFileId = completeData.file_id;
+        updateFileCard(fileInfo);
+
+        uploadedCount++;
+        updateUploadHint();
+        Toast.success(`✅ ${fileInfo.file.name} 恢复上传成功！`);
+
+    } catch (error) {
+        updateFileStatus(fileId, 'error', '恢复失败: ' + error.message, 'danger');
+    }
+}
+
+// 取消上传
+function cancelUpload(fileId) {
+    ossUploader.cancel(fileId);
+    ossUploader.clearCheckpoint(fileId);
+    updateFileStatus(fileId, 'error', '已取消', 'secondary');
+}
+
+// 添加恢复按钮
+function addResumeButton(fileId) {
+    const card = document.getElementById(`file-${fileId}`);
+    if (!card) return;
+    const statusDiv = card.querySelector('.file-status');
+    statusDiv.innerHTML = `
+        <span class="badge bg-warning">上传中断</span>
+        <button class="btn btn-sm btn-outline-primary ms-2" onclick="resumeUpload('${fileId}')">
+            <i class="fas fa-redo me-1"></i>恢复
+        </button>
+        <button class="btn btn-sm btn-outline-danger ms-1" onclick="cancelUpload('${fileId}')">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+}
+
+// 显示取消按钮
+function showCancelButton(fileId) {
+    const card = document.getElementById(`file-${fileId}`);
+    if (!card) return;
+    const cancelBtn = card.querySelector('.btn-outline-danger');
+    if (cancelBtn) cancelBtn.style.display = 'inline-block';
 }
 
 // 更新文件进度

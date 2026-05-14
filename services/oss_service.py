@@ -38,7 +38,8 @@ class OSSClient:
         cfg = oss.config.load_default()
         cfg.credentials_provider = credentials_provider
         cfg.region = 'cn-shanghai'
-        cfg.connection_timeout = 300
+        cfg.connection_timeout = 60
+        cfg.readwrite_timeout = 300
         cfg.max_retries = 3
         cfg.endpoint = self.config.oss_endpoint
         return oss.Client(cfg)

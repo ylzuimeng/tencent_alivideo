@@ -289,37 +289,27 @@ class ICEClient:
             logger.error(f"添加文字叠加失败: {str(e)}")
             raise
 
-    def submit_subtitle_job(self, video_url: str) -> Optional[Dict]:
+    def submit_subtitle_job(self, video_url: str, output_url: str = None) -> Optional[Dict]:
         """
         提交字幕提取作业（ASR 语音识别）
 
+        使用 ICE SubmitASRJob API 提交语音识别作业，结果通过 get_smart_handle_job 查询。
+
         Args:
             video_url: 视频URL
+            output_url: 已废弃，ASR 作业通过 SmartHandleJob 返回结果，无需指定输出 URL
 
         Returns:
             作业信息字典，包含 job_id 和 request_id
         """
         try:
-            request = ice20201109_models.SubmitMediaProducingJobRequest()
+            request = ice20201109_models.SubmitASRJobRequest(
+                input_file=video_url,
+            )
 
-            # 构建 Timeline 用于字幕提取
-            timeline = {
-                "VideoTracks": [{
-                    "VideoTrackClips": [{
-                        "MediaURL": video_url
-                    }]
-                }]
-            }
+            response = self.client.submit_asrjob(request)
 
-            request.timeline = json.dumps(timeline, ensure_ascii=False)
-            request.output_media_config = json.dumps({
-                "SubtitleConfig": {
-                    "ExtractSubtitle": True,
-                    "Format": "SRT"
-                }
-            }, ensure_ascii=False)
-
-            response = self.client.submit_media_producing_job(request)
+            logger.info(f"提交 ASR 作业成功: job_id={response.body.job_id}")
 
             return {
                 'job_id': response.body.job_id,
@@ -475,111 +465,119 @@ class ICEClient:
         """
         查询字幕提取作业结果，解析为统一的 segments 数组格式
 
+        使用 GetSmartHandleJob API 查询 ASR 作业状态和结果。
+        AiResult 字段直接包含 JSON 格式的 segments 数组，无需额外下载 SRT。
+
         Args:
-            job_id: 作业ID
+            job_id: ASR 作业ID
 
         Returns:
-            segments 数组，每条含 index/content/from/to；失败返回 None
+            - None: 作业尚在处理中或查询失败
+            - segments 数组: 作业已完成，每条含 index/content/from/to
         """
         try:
-            request = ice20201109_models.GetMediaProducingJobRequest()
-            request.job_id = job_id
+            request = ice20201109_models.GetSmartHandleJobRequest(job_id=job_id)
+            response = self.client.get_smart_handle_job(request)
+            job_dict = response.body.to_map() if hasattr(response.body, 'to_map') else {}
 
-            response = self.client.get_media_producing_job(request)
-            job_obj = response.body.media_producing_job
-            job_dict = job_obj.to_map() if hasattr(job_obj, 'to_map') else dict(job_obj)
+            state = job_dict.get('State', '')
+            logger.info(f"query_subtitle_job_result: JobId={job_id}, State={state}")
 
-            # 解析字幕列表
-            subtitle_list = (job_dict.get('SubtitleConfig') or {}).get('SubtitleList', [])
-            segments = []
-            for item in subtitle_list:
-                segments.append({
-                    'index': item.get('Index', len(segments)),
-                    'content': item.get('Content', ''),
-                    'from': item.get('StartTime', 0.0),
-                    'to': item.get('EndTime', 0.0),
-                })
+            # 仅 Finished 时解析结果，其他状态返回 None 表示继续轮询
+            if state != 'Finished':
+                if state in ('Failed', 'Canceled'):
+                    logger.error(f"ASR 作业失败: JobId={job_id}, State={state}")
+                return None
 
-            return segments if segments else None
+            # 从 AiResult 解析 segments（ICE ASR 返回的 JSON 数组）
+            job_result = job_dict.get('JobResult', {}) or {}
+            ai_result = job_result.get('AiResult', '')
+
+            if ai_result:
+                segments = self._parse_ai_result_to_segments(ai_result)
+                if segments:
+                    logger.info(f"ASR 作业完成: JobId={job_id}, 共 {len(segments)} 条字幕")
+                    return segments
+
+            # 备选：尝试 Output 字段
+            output = job_dict.get('Output', '')
+            if output:
+                segments = self._parse_ai_result_to_segments(output)
+                if segments:
+                    return segments
+
+            logger.warning(f"ASR 作业完成但无字幕数据: JobId={job_id}")
+            return []
 
         except Exception as e:
             logger.error(f"查询字幕提取结果失败: {str(e)}")
             return None
+
+    def _parse_ai_result_to_segments(self, ai_result: str) -> List[Dict]:
+        """解析 ICE ASR 返回的 AiResult JSON 为 segments 数组
+
+        AiResult 格式: [{"content":"...", "from":0.15, "to":1.56}, ...]
+        """
         try:
-            # 使用正确的API查询作业状态
-            request = ice20201109_models.GetMediaProducingJobRequest()
-            request.job_id = job_id
+            data = json.loads(ai_result)
+            if not isinstance(data, list):
+                return []
 
-            response = self.client.get_media_producing_job(request)
+            segments = []
+            for i, item in enumerate(data):
+                seg = {
+                    'index': i,
+                    'content': item.get('content', ''),
+                    'from': float(item.get('from', 0)),
+                    'to': float(item.get('to', 0)),
+                }
+                segments.append(seg)
+            return segments
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            logger.warning(f"解析 AiResult JSON 失败: {str(e)}")
+            return []
 
-            # 🔍 记录完整响应用于调试
-            logger.info(f"🔍 阿里云 ICE 完整响应: {response}")
+    def _download_and_parse_srt(self, url: str) -> Optional[List[Dict]]:
+        """从 OSS URL 下载 SRT 文件并解析为 segments（备选方案）"""
+        try:
+            import requests
+            resp = requests.get(url, timeout=30)
+            if resp.status_code != 200:
+                return None
 
-            # 解析状态 - response.body.media_producing_job 是一个对象
-            job_obj = response.body.media_producing_job
-
-            # 使用 to_map() 方法转换为字典
-            job_dict = job_obj.to_map() if hasattr(job_obj, 'to_map') else dict(job_obj)
-            status_code = job_dict.get('Status')
-
-            # 映射状态码到内部状态
-            status_map = {
-                'Created': 'pending',
-                'Queued': 'pending',
-                'Processing': 'processing',
-                'Success': 'completed',
-                'Finished': 'completed',
-                'Failed': 'failed',
-                'Canceled': 'failed'
-            }
-            status = status_map.get(status_code, 'pending')
-
-            # 计算进度
-            progress_map = {
-                'Created': 0,
-                'Queued': 10,
-                'Processing': 50,
-                'Success': 100,
-                'Finished': 100,
-                'Failed': 0,
-                'Canceled': 0
-            }
-            progress = progress_map.get(status_code, 0)
-
-            return {
-                'status': status,
-                'progress': progress,
-                'output_url': job_dict.get('MediaURL')
-            }
-
+            srt_text = resp.text
+            return self._parse_srt_to_segments(srt_text)
         except Exception as e:
-            logger.error(f"查询作业状态失败: {str(e)}")
+            logger.warning(f"下载/解析 SRT 文件失败: {url}, 错误: {str(e)}")
             return None
 
-    def _map_status(self, ice_status: str) -> str:
-        """映射ICE状态到内部状态"""
-        status_map = {
-            'Created': 'pending',
-            'Queued': 'pending',
-            'Processing': 'processing',
-            'Finished': 'completed',
-            'Failed': 'failed',
-            'Canceled': 'failed'
-        }
-        return status_map.get(ice_status, 'pending')
+    def _parse_srt_to_segments(self, srt_text: str) -> List[Dict]:
+        """将 SRT 文本解析为 segments 数组（备选方案）"""
+        import re
+        segments = []
+        blocks = srt_text.strip().split('\n\n')
+        for i, block in enumerate(blocks):
+            lines = block.strip().split('\n')
+            if len(lines) < 3:
+                continue
+            time_match = re.match(
+                r'(\d+):(\d+):(\d+)[.,](\d+)\s*-->\s*(\d+):(\d+):(\d+)[.,](\d+)',
+                lines[1]
+            )
+            if not time_match:
+                continue
+            h1, m1, s1, ms1, h2, m2, s2, ms2 = map(int, time_match.groups())
+            from_sec = h1 * 3600 + m1 * 60 + s1 + ms1 / 1000.0
+            to_sec = h2 * 3600 + m2 * 60 + s2 + ms2 / 1000.0
+            content = '\n'.join(lines[2:])
 
-    def _parse_progress(self, project: Dict) -> int:
-        """解析进度"""
-        status = project.get('status', 'Unknown')
-        progress_map = {
-            'Created': 0,
-            'Queued': 10,
-            'Processing': 50,
-            'Finished': 100,
-            'Failed': 0,
-            'Canceled': 0
-        }
-        return progress_map.get(status, 0)
+            segments.append({
+                'index': i,
+                'content': content,
+                'from': from_sec,
+                'to': to_sec,
+            })
+        return segments
 
     def create_timeline_from_advanced_template(self, video_template, main_video_url: str, doctor_info) -> str:
         """

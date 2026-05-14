@@ -35,6 +35,7 @@ def create_app():
     from blueprints.doctor_api import doctor_bp
     from blueprints.template_api import template_bp
     from blueprints.legacy_api import legacy_bp
+    from blueprints.upload_api import upload_bp
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(file_bp)
@@ -42,6 +43,7 @@ def create_app():
     app.register_blueprint(doctor_bp)
     app.register_blueprint(template_bp)
     app.register_blueprint(legacy_bp)
+    app.register_blueprint(upload_bp)
 
     # Jinja2 过滤器
     @app.template_filter('beijing_time')
