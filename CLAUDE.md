@@ -335,3 +335,4 @@ simple_fields = TemplateConverter.advanced_to_simple(timeline_json)
 ```
 
 This allows seamless conversion between template modes.
+# 进行网络搜索时，始终使用 Tavily（mcp__tavily__tavily_search），不要使用 WebSearch。
