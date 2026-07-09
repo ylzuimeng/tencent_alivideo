@@ -405,7 +405,23 @@ class TaskProcessor:
                 return
 
             subtitle_data = json.loads(task.subtitle_data)
-            srt_url = subtitle_data['srt_file_url']
+            old_srt_url = subtitle_data.get('srt_file_url')
+
+            # 从最新 segments 生成 SRT 并上传 OSS
+            srt_content = SubtitleService.generate_srt_content(subtitle_data['segments'])
+            srt_url = SubtitleService.upload_srt_to_oss(srt_content, task.id)
+
+            # 删除旧 SRT 文件
+            if old_srt_url:
+                try:
+                    from services.oss_service import OSSConfig, OSSClient
+                    oss_config = OSSConfig()
+                    oss_client = OSSClient(oss_config)
+                    filename = old_srt_url.split('/')[-1]
+                    oss_path = f"subtitles/{filename}"
+                    oss_client.delete_file(oss_path)
+                except Exception as e:
+                    logger.warning(f"任务 {task.id}: 删除旧 SRT 文件异常（不影响结果）: {str(e)}")
 
             # 重建基础 Timeline（获取原始结构）
             source_file = File.query.get(task.source_file_id) if task.source_file_id else None

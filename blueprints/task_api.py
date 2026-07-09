@@ -200,18 +200,12 @@ def update_subtitles(task_id):
         updated_segments = data['segments']
         updated_data = SubtitleService.update_subtitle_content(subtitle_data, updated_segments)
 
-        # 重新生成 SRT 并上传 OSS
-        srt_content = SubtitleService.generate_srt_content(updated_data['segments'])
-        srt_url = SubtitleService.upload_srt_to_oss(srt_content, task.id)
-
-        # 更新 subtitle_data
-        updated_data['srt_file_url'] = srt_url
+        # 仅更新本地数据库，SRT 生成推迟到重新合成时进行
         task.subtitle_data = json.dumps(updated_data, ensure_ascii=False)
         db.session.commit()
 
         return jsonify({
-            'message': '字幕保存成功',
-            'srt_file_url': srt_url
+            'message': '字幕保存成功'
         })
 
     except Exception as e:
