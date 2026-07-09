@@ -90,7 +90,7 @@ def template_delete_file(file_id):
         success, data, status_code = delete_from_oss(file, 'templates', db)
 
         if success:
-            return redirect(url_for('pages.templates'))
+            return jsonify({'success': True, 'message': '删除成功'}), 200
         return jsonify(data), status_code
 
     except Exception as e:
@@ -108,7 +108,7 @@ def delete_file(file_id):
         success, data, status_code = delete_from_oss(file, 'uploads', db)
 
         if success:
-            return redirect(url_for('pages.files'))
+            return jsonify({'success': True, 'message': '删除成功'}), 200
         return jsonify(data), status_code
 
     except Exception as e:

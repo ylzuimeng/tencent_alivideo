@@ -339,7 +339,7 @@ function deleteFile(fileId, filename) {
         })
         .then(response => response.json())
         .then(result => {
-            if (result.success || response.ok) {
+            if (result.success) {
                 alert('文件删除成功');
                 loadFiles();
             } else {

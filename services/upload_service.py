@@ -85,7 +85,8 @@ def delete_from_oss(file_record, prefix, db):
     delete_success = oss_client.delete_file(oss_path)
 
     if not delete_success:
-        logger.warning(f"OSS文件删除失败或文件不存在: {oss_path}")
+        logger.error(f"OSS文件删除失败: {oss_path}")
+        return False, {'error': 'OSS文件删除失败'}, 500
 
     db.session.delete(file_record)
     db.session.commit()
