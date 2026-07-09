@@ -12,10 +12,32 @@
         display: flex;
         flex-direction: column;
     }
-    .video-panel video {
+    .video-wrapper {
+        position: relative;
+    }
+    .video-wrapper video {
         width: 100%;
         border-radius: 8px;
         background: #000;
+        display: block;
+    }
+    .subtitle-overlay {
+        position: absolute;
+        bottom: 40px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        pointer-events: none;
+        z-index: 10;
+    }
+    .subtitle-overlay span {
+        display: inline-block;
+        background: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 18px;
+        line-height: 1.5;
     }
     .subtitle-panel {
         flex: 0 0 40%;
@@ -73,30 +95,68 @@
         align-items: center;
         justify-content: space-between;
         margin-bottom: 16px;
-        padding: 12px 16px;
-        background: #f8f9fa;
-        border-radius: 8px;
+        padding: 12px 20px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        border: 1px solid #f0f0f0;
     }
     .toolbar h3 {
         margin: 0;
         font-size: 18px;
+        font-weight: 600;
+        color: #1a1a2e;
     }
     .save-status {
-        font-size: 14px;
-        padding: 4px 12px;
+        font-size: 13px;
+        padding: 6px 14px;
         border-radius: 20px;
+        font-weight: 500;
+        transition: all 0.3s ease;
     }
     .save-status.saved {
-        color: #198754;
-        background: #d1e7dd;
+        color: #fff;
+        background: linear-gradient(135deg, #10b981, #059669);
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
     }
     .save-status.saving {
-        color: #0d6efd;
-        background: #cfe2ff;
+        color: #fff;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
     }
     .save-status.unsaved {
-        color: #dc3545;
-        background: #f8d7da;
+        color: #fff;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+    }
+    .recompose-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 18px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #fff;
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        border: none;
+        border-radius: 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+    }
+    .recompose-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.45);
+        background: linear-gradient(135deg, #818cf8, #6366f1);
+        color: #fff;
+    }
+    .recompose-btn:active {
+        transform: translateY(0);
+    }
+    .recompose-btn:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+        transform: none;
     }
 </style>
 {% endblock %}
@@ -106,23 +166,26 @@
     <div class="d-flex align-items-center gap-3">
         <h3>{{ task.task_name }}</h3>
     </div>
-    <div class="d-flex align-items-center gap-3">
+    <div class="d-flex align-items-center gap-2">
+        <button id="recomposeBtn" class="recompose-btn" onclick="handleRecompose()">
+            <i class="fas fa-sync-alt"></i> 重新合成
+        </button>
         <span id="saveStatus" class="save-status saved">
             <i class="fas fa-check-circle"></i> 已保存
         </span>
-        <button id="recomposeBtn" class="btn btn-outline-warning" onclick="handleRecompose()">
-            <i class="fas fa-sync-alt"></i> 重新合成
-        </button>
     </div>
 </div>
 
 <div class="edit-subtitles-container">
     <!-- 左侧视频面板 -->
     <div class="video-panel">
-        <video id="subtitleVideo" controls preload="metadata">
-            <source src="{{ task.output_oss_url }}" type="video/mp4">
-            您的浏览器不支持视频播放。
-        </video>
+        <div class="video-wrapper">
+            <video id="subtitleVideo" controls preload="metadata">
+                <source src="{{ task.output_oss_url }}" type="video/mp4">
+                您的浏览器不支持视频播放。
+            </video>
+            <div id="subtitleOverlay" class="subtitle-overlay"></div>
+        </div>
     </div>
 
     <!-- 右侧字幕面板 -->
@@ -147,6 +210,7 @@ class SubtitleEditor {
         this.video = document.getElementById('subtitleVideo');
         this.subtitleList = document.getElementById('subtitleList');
         this.saveStatus = document.getElementById('saveStatus');
+        this.subtitleOverlay = document.getElementById('subtitleOverlay');
 
         this.init();
     }
@@ -237,6 +301,13 @@ class SubtitleEditor {
                 }
             }
             this.currentIndex = activeIdx;
+        }
+        // 更新视频字幕叠加
+        if (activeIdx >= 0) {
+            this.subtitleOverlay.innerHTML = `<span>${this.escapeHtml(this.segments[activeIdx].content)}</span>`;
+            this.subtitleOverlay.style.display = 'block';
+        } else {
+            this.subtitleOverlay.style.display = 'none';
         }
     }
 
@@ -332,9 +403,9 @@ async function handleRecompose() {
         }
 
         // 轮询进度
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 重新合成中...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 合成中...';
         statusEl.className = 'save-status saving';
-        statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 合成中...';
+        statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 处理中...';
 
         let maxAttempts = 120;
         while (maxAttempts-- > 0) {
