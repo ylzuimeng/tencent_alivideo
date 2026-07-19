@@ -160,3 +160,5 @@ work/
 .claude/
 learn/
 skills-lock.json
+node_modules/
+.sandcastle/
